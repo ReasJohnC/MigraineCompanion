@@ -6,6 +6,9 @@
   --muted: #566b72;
   --line: #e1e8ea;
   --line-strong: #bfd0d4;
+  /* Boundaries of interactive controls need 3:1 against their background (WCAG 1.4.11);
+     --line-strong reaches only 1.59:1 and stays on decorative dividers. */
+  --line-control: #7d959b;
   --accent: #ff7a45;
   --accent-deep: #b3461f;
   --accent-2: #2f7d8a;
@@ -70,6 +73,17 @@ a {
 
 .skip-link:focus {
   transform: translateY(0);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .site-header {
@@ -313,6 +327,11 @@ h3 {
   touch-action: pan-y;
 }
 
+.brain-stage:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+
 .brain-stage canvas {
   width: 100%;
   height: 100%;
@@ -392,8 +411,11 @@ h3 {
 }
 
 .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
   min-height: 44px;
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--line-control);
   border-radius: 999px;
   background: var(--surface);
   color: var(--text);
@@ -408,15 +430,38 @@ h3 {
     transform 180ms ease;
 }
 
+/* Selection was signalled by colour alone. The indicator fills as well as recolours, so
+   the state survives a monochrome or colour-blind reading. */
+.chip::before {
+  content: "";
+  flex: none;
+  width: 0.8em;
+  height: 0.8em;
+  border: 1.5px solid var(--line-control);
+  border-radius: 50%;
+  transition:
+    border-color 180ms ease,
+    background-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
 .chip:hover {
   border-color: var(--teal);
   transform: translateY(-1px);
 }
 
-.chip[aria-pressed="true"] {
+.chip[aria-pressed="true"],
+.chip[aria-checked="true"] {
   border-color: rgba(255, 122, 69, 0.82);
   color: var(--accent-deep);
   box-shadow: 0 0 0 3px rgba(255, 122, 69, 0.12);
+}
+
+.chip[aria-pressed="true"]::before,
+.chip[aria-checked="true"]::before {
+  border-color: var(--accent-deep);
+  background: var(--accent-deep);
+  box-shadow: inset 0 0 0 2px var(--surface);
 }
 
 .chip:focus-visible,
@@ -441,28 +486,12 @@ h3 {
   font-weight: 760;
 }
 
-.symptom-line {
-  color: var(--text) !important;
-  font-size: 1rem;
-  font-weight: 700;
-}
-
 .zoom-callout {
   display: grid;
   grid-template-columns: 112px minmax(0, 1fr);
   gap: 1rem;
   align-items: center;
   margin-top: 1.5rem;
-  opacity: 0;
-  transform: translateY(8px);
-  transition:
-    opacity 220ms ease,
-    transform 220ms ease;
-}
-
-.zoom-callout.is-visible {
-  opacity: 1;
-  transform: translateY(0);
 }
 
 .nucleus-zoom {
@@ -510,6 +539,15 @@ h3 {
   font-weight: 760;
 }
 
+/* Derived from the beam vector, not authored — it must read as a measurement. */
+.callout-angle {
+  margin-top: 0.35rem;
+  color: var(--teal) !important;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
+}
+
 .action-row {
   display: flex;
   flex-wrap: wrap;
@@ -538,7 +576,7 @@ h3 {
 }
 
 .secondary-action {
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--line-control);
   background: var(--surface);
   color: var(--text);
 }
@@ -789,7 +827,7 @@ h3 {
 }
 
 .accordion-item {
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--line-control);
   border-radius: var(--radius);
   background: var(--surface);
   overflow: hidden;
@@ -917,7 +955,7 @@ h3 {
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 0.9rem;
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--line-control);
   border-radius: 999px;
   background: var(--surface);
   color: var(--muted);
@@ -989,7 +1027,23 @@ h3 {
 }
 
 .panel-detail {
+  display: grid;
+  gap: 0.5rem;
   font-size: 0.95rem;
+}
+
+/* Only rendered when a selection reaches more than one structure, to keep the
+   descriptions apart. */
+.detail-structure {
+  color: var(--text) !important;
+  font-size: 0.84rem;
+  font-weight: 760;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.detail-structure:not(:first-child) {
+  margin-top: 0.6rem;
 }
 
 /* ---------- Structures reference ---------- */
@@ -1006,11 +1060,6 @@ h3 {
 
 .reference-panel p {
   color: var(--muted);
-}
-
-.reference-panel .zoom-callout {
-  opacity: 1;
-  transform: none;
 }
 
 /* ---------- Pineal body ---------- */

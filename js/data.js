@@ -35,7 +35,7 @@ export const SYMPTOMS = [
     id: 'mood',
     label: 'Mood Alterations',
     structureId: 'lateral-tuberal',
-    beamDir: [0.501, 0.852, -0.15],
+    beamDir: [0.501149, 0.852254, -0.150045],
     detail: LATERAL_TUBERAL_DETAIL,
   },
   {
@@ -44,14 +44,14 @@ export const SYMPTOMS = [
     structureId: 'lateral-tuberal',
     // 24 degrees off the mood angle, through the same nucleus, so the two read as
     // distinct strikes on one target.
-    beamDir: [0.614, 0.753, 0.238],
+    beamDir: [0.613801, 0.752756, 0.237923],
     detail: LATERAL_TUBERAL_DETAIL,
   },
   {
     id: 'fluid',
     label: 'Fluid Balance',
     structureId: 'paraventricular',
-    beamDir: [0.205, 0.973, -0.102],
+    beamDir: [0.205086, 0.97341, -0.102043],
     detail:
       'Close within the neural neighborhood is a region associated with fluid balance. These areas are almost "next door" to one another.',
   },
@@ -59,7 +59,7 @@ export const SYMPTOMS = [
     id: 'wake',
     label: 'Wakefulness',
     structureId: 'suprachiasmatic',
-    beamDir: [0.704, 0.704, -0.101],
+    beamDir: [0.703496, 0.703496, -0.100928],
     detail:
       'Just down the block in the neural neighborhood is an area linked to wakefulness—particularly symptoms that often seem opposite to alertness.',
   },
@@ -71,7 +71,7 @@ export const AURA_SYMPTOM = {
   id: 'aura',
   label: 'Visual Aura',
   structureId: 'pineal',
-  beamDir: [-0.612, 0.764, -0.204],
+  beamDir: [-0.612044, 0.764055, -0.204015],
   detail:
     'The pineal body (gland) is a notable site within the migraine prodrome zone. Historically, it has been linked to sleep-wake cycles. More recently, it has been placed on the zone map as a key site associated with the most common type of visual migraine aura. In the old map days, an uncharted course might be labeled "here be dragons." In the pineal-body chart area, we can now say, "here be microcrystals." This helps explain the distinctive, consistent experience of the most common visual aura: the scintillating scotoma. If your visual aura takes this form, the pineal body is the likely associated site.',
 };

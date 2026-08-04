@@ -59,8 +59,31 @@ const CAMERA_PRESETS = {
   },
 };
 
+// An ellipsoid fitted inside the displaced cerebrum's measured bounds (x -1.13..1.19,
+// y -0.59..0.84, z -0.64..0.68), so any point on it is under the cortical surface rather
+// than in open air. It bounds where the cursor may travel and marks where the force
+// crosses into the tissue.
+const CORTEX_HULL_CENTER = new THREE.Vector3(0.02, 0.06, 0);
+const CORTEX_HULL_RADII = new THREE.Vector3(1.1, 0.68, 0.6);
+
 function clamp(value, min = 0, max = 1) {
   return Math.min(max, Math.max(min, value));
+}
+
+// Where a beam crosses the cortical hull, as progress along its full length. Returns
+// null for a line that misses the hull entirely, which no configured beam does.
+function hullCrossings(source, travel, fullLength) {
+  const origin = source.clone().sub(CORTEX_HULL_CENTER).divide(CORTEX_HULL_RADII);
+  const direction = travel.clone().multiplyScalar(fullLength).divide(CORTEX_HULL_RADII);
+
+  const a = direction.dot(direction);
+  const b = 2 * origin.dot(direction);
+  const c = origin.dot(origin) - 1;
+  const discriminant = b * b - 4 * a * c;
+  if (discriminant <= 0) return null;
+
+  const root = Math.sqrt(discriminant);
+  return { entry: (-b - root) / (2 * a), exit: (-b + root) / (2 * a) };
 }
 
 function easeInOutCubic(t) {
@@ -205,11 +228,12 @@ function corticalFoldSignal(x, y, z) {
   return clamp(foldedBands * 0.66 + cellular * 0.34);
 }
 
+// Both caches hand out clones and never the cached object itself, so a scene disposing
+// its own geometry cannot take the shared original down with it.
 let cerebrumGeoCache = null;
 function createCerebrumGeometry() {
   if (cerebrumGeoCache) return cerebrumGeoCache.clone();
   const geometry = new THREE.IcosahedronGeometry(1, 60);
-  cerebrumGeoCache = geometry;
   const position = geometry.attributes.position;
   const colors = new Float32Array(position.count * 3);
   const unit = new THREE.Vector3();
@@ -287,7 +311,8 @@ function createCerebrumGeometry() {
   geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   geometry.computeVertexNormals();
   geometry.computeBoundingSphere();
-  return geometry;
+  cerebrumGeoCache = geometry;
+  return geometry.clone();
 }
 
 let cerebellumGeoCache = null;
@@ -348,7 +373,8 @@ function createCerebellumGeometry() {
   geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   geometry.computeVertexNormals();
   geometry.computeBoundingSphere();
-  return geometry;
+  cerebellumGeoCache = geometry;
+  return geometry.clone();
 }
 
 function createBrainstemGeometry() {
@@ -367,21 +393,6 @@ function createBrainstemGeometry() {
   const geometry = new THREE.LatheGeometry(profile, 48);
   geometry.computeVertexNormals();
   return geometry;
-}
-
-function createLongitudinalFissureGeometry() {
-  const points = [];
-  for (let i = 0; i <= 72; i += 1) {
-    const t = i / 72;
-    const x = lerp(-0.91, 0.9, t);
-    const crown = Math.sin(t * Math.PI);
-    const y = 0.33 + crown * 0.27 + (fbmNoise3(t * 5.6 + 2.4, 1.7, 4.3, 2) - 0.5) * 0.035;
-    const z = 0.012 + Math.sin(t * Math.PI * 3.2) * 0.004;
-    points.push(new THREE.Vector3(x, y, z));
-  }
-
-  const curve = new THREE.CatmullRomCurve3(points);
-  return new THREE.TubeGeometry(curve, 96, 0.012, 8, false);
 }
 
 function disposeObject(object) {
@@ -452,6 +463,9 @@ export class BrainScene {
     this.controls.maxDistance = 4.2;
     this.controls.maxPolarAngle = Math.PI * 0.78;
     this.controls.minPolarAngle = Math.PI * 0.15;
+
+    this.handleKey = this.handleKey.bind(this);
+    this.container.addEventListener('keydown', this.handleKey);
 
     this.applyModeDefaults(true);
     this.resize();
@@ -543,18 +557,8 @@ export class BrainScene {
     brainstem.renderOrder = 1;
     this.root.add(brainstem);
 
-    const fissure = new THREE.Mesh(
-      createLongitudinalFissureGeometry(),
-      new THREE.MeshBasicMaterial({
-        color: 0x594345,
-        transparent: true,
-        opacity: 0.38,
-        depthWrite: false,
-        side: THREE.DoubleSide,
-      }),
-    );
-    fissure.renderOrder = 3;
-    this.root.add(fissure);
+    // The longitudinal fissure is cut into the cortical displacement field (see the
+    // `fissure` term in createCerebrumGeometry) rather than drawn as an object on top.
 
     const ventricle = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 16), innerMaterial);
     ventricle.scale.set(0.12, 0.22, 0.05);
@@ -777,6 +781,8 @@ export class BrainScene {
       cursor.renderOrder = 16;
       group.add(cursor);
 
+      const crossings = hullCrossings(source, travel, fullLength);
+
       this.root.add(group);
       this.beams.set(symptom.id, {
         group,
@@ -784,6 +790,9 @@ export class BrainScene {
         travel,
         fullLength,
         target,
+        // The structure sits at 0.5 by construction; travel stops at the far surface.
+        entryProgress: crossings?.entry ?? 0,
+        exitProgress: crossings?.exit ?? 1,
         core,
         halo,
         sourceGlow,
@@ -823,6 +832,60 @@ export class BrainScene {
     this.moveCameraTo(preset, immediate || this.reducedMotion ? 0 : 650);
   }
 
+  // Keyboard orbit: the stage is a control surface, and a pointer was the only way to
+  // turn the model. Arrows rotate, +/- zoom, 0 returns to the section's framing.
+  handleKey(event) {
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+
+    const ROTATE_STEP = 0.14;
+    const ZOOM_STEP = 1.12;
+    const offset = this.camera.position.clone().sub(this.controls.target);
+    const spherical = new THREE.Spherical().setFromVector3(offset);
+
+    switch (event.key) {
+      case 'ArrowLeft':
+        spherical.theta -= ROTATE_STEP;
+        break;
+      case 'ArrowRight':
+        spherical.theta += ROTATE_STEP;
+        break;
+      case 'ArrowUp':
+        spherical.phi -= ROTATE_STEP;
+        break;
+      case 'ArrowDown':
+        spherical.phi += ROTATE_STEP;
+        break;
+      case '+':
+      case '=':
+        spherical.radius /= ZOOM_STEP;
+        break;
+      case '-':
+      case '_':
+        spherical.radius *= ZOOM_STEP;
+        break;
+      case '0':
+        event.preventDefault();
+        this.moveCameraTo(
+          CAMERA_PRESETS[this.mode] ?? CAMERA_PRESETS.structures,
+          this.reducedMotion ? 0 : 420,
+        );
+        return;
+      default:
+        return;
+    }
+
+    event.preventDefault();
+    spherical.phi = clamp(spherical.phi, this.controls.minPolarAngle, this.controls.maxPolarAngle);
+    spherical.radius = clamp(
+      spherical.radius,
+      this.controls.minDistance,
+      this.controls.maxDistance,
+    );
+    this.camera.position.copy(this.controls.target).add(new THREE.Vector3().setFromSpherical(spherical));
+    this.camera.lookAt(this.controls.target);
+    this.controls.update();
+  }
+
   setReducedMotion(value) {
     this.reducedMotion = Boolean(value);
     if (this.controls) {
@@ -854,23 +917,39 @@ export class BrainScene {
     const beam = this.beams.get(id);
     if (!beam) return;
     beam.group.visible = visible;
-    if (!visible) beam.flareMaterial.opacity = 0;
+    if (!visible) {
+      beam.flareMaterial.opacity = 0;
+      this.setCursorVisible(id, false);
+    }
+  }
+
+  // The cursor means "the force is travelling right now". Anything else — a resolved
+  // strike, the capstone fan — has no cursor, so none is ever left parked in open space.
+  setCursorVisible(id, visible) {
+    const beam = this.beams.get(id);
+    if (!beam) return;
+    beam.cursor.visible = visible;
+    beam.cursorHalo.visible = visible;
   }
 
   setBeamCursor(id, progress) {
     const beam = this.beams.get(id);
     if (!beam) return;
 
-    const safeProgress = clamp(progress);
+    const timeline = clamp(progress);
+    // The outbound half is compressed so the cursor stops at the far cortical surface
+    // instead of continuing into open air on the other side of the head.
+    const travelled =
+      timeline <= 0.5 ? timeline : 0.5 + (timeline - 0.5) * (beam.exitProgress - 0.5) * 2;
     const point = beam.source
       .clone()
-      .add(beam.travel.clone().multiplyScalar(beam.fullLength * safeProgress));
+      .add(beam.travel.clone().multiplyScalar(beam.fullLength * travelled));
 
     beam.cursor.position.copy(point);
     beam.cursorHalo.position.copy(point);
 
     // Everything brightens as the cursor passes through the structure.
-    const nearness = 1 - clamp(Math.abs(safeProgress - 0.5) / 0.14);
+    const nearness = 1 - clamp(Math.abs(timeline - 0.5) / 0.14);
     const strength = smoothstep(0, 1, nearness);
     beam.flareMaterial.opacity = 0.34 * strength;
     beam.flare.scale.setScalar(1 + 2.6 * strength);
@@ -879,10 +958,26 @@ export class BrainScene {
     beam.coreMaterial.opacity = 0.3 + 0.24 * strength;
   }
 
+  // The look a beam holds once the force has passed through: lit at the structure, no
+  // cursor. The flare is additive and the four targets sit within about 0.3 units of each
+  // other, so several at once stack into one white blob — beams shown together decay to a
+  // thin trace instead, and the fan reads as distinct paths.
+  setBeamResolved(id, { flare = true } = {}) {
+    const beam = this.beams.get(id);
+    if (!beam) return;
+    this.setBeamVisible(id, true);
+    this.setCursorVisible(id, false);
+    beam.flareMaterial.opacity = flare ? 0.34 : 0;
+    beam.flare.scale.setScalar(flare ? 3.6 : 1);
+    beam.coreMaterial.opacity = flare ? 0.54 : 0.4;
+    beam.haloMaterial.opacity = flare ? 0.1 : 0.055;
+  }
+
   hideBeams() {
     this.beams.forEach((_, id) => {
       this.setBeamVisible(id, false);
       this.setBeamCursor(id, 0);
+      this.setCursorVisible(id, false);
     });
   }
 
@@ -912,6 +1007,7 @@ export class BrainScene {
       }
       this.setBeamVisible(id, true);
       this.setBeamCursor(id, 0);
+      this.setCursorVisible(id, true);
       this.beamAnimations.set(id, {
         startedAt: performance.now() + (options.delay ?? 0),
         onCross: options.onCross,
@@ -938,6 +1034,7 @@ export class BrainScene {
       }
 
       if (elapsed >= BEAM_DURATION) {
+        this.setBeamResolved(id, { flare: this.activeIds.length === 1 });
         this.beamAnimations.delete(id);
         animation.resolve?.();
         if (!this.beamAnimations.size) this.updateRunState();
@@ -972,8 +1069,7 @@ export class BrainScene {
 
     if (this.reducedMotion || options.instant) {
       list.forEach((id) => {
-        this.setBeamVisible(id, true);
-        this.setBeamCursor(id, 1);
+        this.setBeamResolved(id, { flare: list.length === 1 });
         options.onCross?.(id);
       });
       return Promise.resolve();
@@ -1029,12 +1125,32 @@ export class BrainScene {
     this.cameraFrame = requestAnimationFrame(step);
   }
 
-  async playSequence(ids = BEAM_SEQUENCE, options = {}) {
-    if (this.reducedMotion) {
-      this.showAllBeams();
-      return true;
-    }
+  // Reveals one angle on its own, with no travel. The reduced-motion capstone steps
+  // through the sequence with this so "Play" and "Show all" stay different actions.
+  showSingleAngle(id) {
+    this.sequenceToken += 1;
+    this.stopAnimations();
+    this.hideMarkers();
+    this.hideBeams();
+    if (!this.beams.has(id)) return;
 
+    this.activeIds = [id];
+    const symptom = getSymptom(id);
+    if (symptom) this.setMarkerVisible(symptom.structureId, true);
+    this.setBeamResolved(id);
+
+    const preset =
+      (symptom && CAMERA_PRESETS[symptom.structureId]) ?? CAMERA_PRESETS[this.mode];
+    this.moveCameraTo(preset, this.reducedMotion ? 0 : 520);
+  }
+
+  // Invalidates the running sequence's token, so its loop stops at the next step.
+  cancelSequence() {
+    this.sequenceToken += 1;
+    this.clearActive();
+  }
+
+  async playSequence(ids = BEAM_SEQUENCE, options = {}) {
     const token = this.sequenceToken + 1;
     this.sequenceToken = token;
     this.clearActive();
@@ -1063,8 +1179,7 @@ export class BrainScene {
     BEAM_SEQUENCE.forEach((id) => {
       const symptom = getSymptom(id);
       if (symptom) this.setMarkerVisible(symptom.structureId, true);
-      this.setBeamVisible(id, true);
-      this.setBeamCursor(id, 1);
+      this.setBeamResolved(id, { flare: false });
     });
   }
 
@@ -1101,6 +1216,7 @@ export class BrainScene {
     this.stopAnimations();
     cancelAnimationFrame(this.frame);
     this.viewportObserver?.disconnect();
+    this.container.removeEventListener('keydown', this.handleKey);
     document.removeEventListener('visibilitychange', this.updateRunState);
     this.resizeObserver?.disconnect();
     this.controls?.dispose();

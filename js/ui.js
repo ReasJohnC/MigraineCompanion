@@ -11,14 +11,6 @@ import {
 
 const STORAGE_KEY = 'migraine-companion:last-selection';
 
-const CALLOUT_ANGLES = {
-  mood: '-34deg',
-  gut: '-8deg',
-  fluid: '-74deg',
-  wake: '-18deg',
-  aura: '132deg',
-};
-
 const MODE_LABELS = {
   'no-aura': 'Migraine without Aura',
   aura: 'Migraine with Aura',
@@ -27,6 +19,73 @@ const MODE_LABELS = {
 function setText(selector, value) {
   const element = document.querySelector(selector);
   if (element) element.textContent = value;
+}
+
+// The callout draws the real beam vector, viewed sagittally: model +X (anterior) runs
+// right and +Y (superior) runs up, so a CSS rotation is the screen-space bearing of the
+// projected direction. The stated number is the elevation above the axial plane, which
+// is a property of the vector itself rather than of this projection.
+function calloutGeometry(beamDir) {
+  const [x, y] = beamDir;
+  const bearing = (Math.atan2(-y, x) * 180) / Math.PI;
+  const elevation = (Math.asin(Math.abs(y)) * 180) / Math.PI;
+  return { angle: `${bearing.toFixed(1)}deg`, elevation: `${elevation.toFixed(1)}°` };
+}
+
+// One builder for both chip groups. Roving tabindex keeps a group of controls to a
+// single tab stop, with the arrow keys moving inside it.
+function buildChipGroup(list, items, { single, label, onSelect }) {
+  list.setAttribute('role', single ? 'radiogroup' : 'group');
+  list.setAttribute('aria-label', label);
+
+  const stateAttribute = single ? 'aria-checked' : 'aria-pressed';
+
+  const focus = (index) => {
+    buttons.forEach((button, i) => button.setAttribute('tabindex', i === index ? '0' : '-1'));
+    buttons[index].focus();
+    if (single) onSelect(items[index].id);
+  };
+
+  const buttons = items.map((item, index) => {
+    const button = document.createElement('button');
+    button.className = 'chip';
+    button.type = 'button';
+    if (single) button.setAttribute('role', 'radio');
+    button.dataset.symptomId = item.id;
+    button.setAttribute(stateAttribute, 'false');
+    button.setAttribute('tabindex', index === 0 ? '0' : '-1');
+    button.textContent = item.label;
+    button.addEventListener('click', () => onSelect(item.id));
+    button.addEventListener('keydown', (event) => {
+      const last = buttons.length - 1;
+      let next = null;
+      if (event.key === 'ArrowRight' || event.key === 'ArrowDown') next = (index + 1) % buttons.length;
+      else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') next = (index + last) % buttons.length;
+      else if (event.key === 'Home') next = 0;
+      else if (event.key === 'End') next = last;
+      if (next === null) return;
+      event.preventDefault();
+      focus(next);
+    });
+    list.appendChild(button);
+    return button;
+  });
+
+  return {
+    buttons,
+    // Marks the selected chips and moves the group's single tab stop onto the first of
+    // them, so tabbing back in lands on the current choice.
+    setSelected(ids) {
+      let tabStop = -1;
+      buttons.forEach((button, index) => {
+        const on = ids.includes(button.dataset.symptomId);
+        button.setAttribute(stateAttribute, String(on));
+        if (on && tabStop < 0) tabStop = index;
+      });
+      const stop = tabStop < 0 ? 0 : tabStop;
+      buttons.forEach((button, index) => button.setAttribute('tabindex', index === stop ? '0' : '-1'));
+    },
+  };
 }
 
 function safeRead() {
@@ -154,21 +213,14 @@ function buildSymptomBlock(container, mode, onSingle, onCombination) {
 
   const chipList = document.createElement('div');
   chipList.className = 'chip-list';
-  chipList.setAttribute('role', 'group');
-  chipList.setAttribute('aria-label', `Prodrome symptoms, ${MODE_LABELS[mode]}`);
   container.appendChild(chipList);
 
-  const chips = SYMPTOMS.map((symptom) => {
-    const button = document.createElement('button');
-    button.className = 'chip';
-    button.type = 'button';
-    button.dataset.symptomId = symptom.id;
-    button.setAttribute('aria-pressed', 'false');
-    button.textContent = symptom.label;
-    button.addEventListener('click', () => onSingle(symptom.id));
-    chipList.appendChild(button);
-    return button;
+  const group = buildChipGroup(chipList, SYMPTOMS, {
+    single: false,
+    label: `Prodrome symptoms, ${MODE_LABELS[mode]}`,
+    onSelect: onSingle,
   });
+  const chips = group.buttons;
 
   const combination = document.createElement('div');
   combination.className = 'combination-block';
@@ -205,7 +257,7 @@ function buildSymptomBlock(container, mode, onSingle, onCombination) {
     return input;
   });
 
-  return { chips, boxes };
+  return { chips, boxes, group };
 }
 
 function initSimulator(scene) {
@@ -225,7 +277,7 @@ function initSimulator(scene) {
     empty.className = 'readout-empty';
     empty.textContent = message;
     readoutList.appendChild(empty);
-    if (detail) detail.textContent = '';
+    detail?.replaceChildren();
   };
 
   const appendReadout = (id) => {
@@ -240,6 +292,35 @@ function initSimulator(scene) {
     readoutList.appendChild(line);
   };
 
+  // Selecting more than one symptom used to empty this panel, so the most engaged action
+  // available returned the least information. Several symptoms can share a nucleus, so the
+  // panel describes each distinct structure the selection reaches, once.
+  const setDetail = (ids) => {
+    if (!detail) return;
+    detail.replaceChildren();
+
+    const seen = new Set();
+    const structures = [];
+    ids.forEach((id) => {
+      const symptom = getSymptom(id);
+      if (!symptom || seen.has(symptom.structureId)) return;
+      seen.add(symptom.structureId);
+      structures.push({ structure: getStructure(symptom.structureId), detail: symptom.detail });
+    });
+
+    structures.forEach((entry) => {
+      if (structures.length > 1) {
+        const name = document.createElement('p');
+        name.className = 'detail-structure';
+        name.textContent = entry.structure?.name ?? '';
+        detail.appendChild(name);
+      }
+      const body = document.createElement('p');
+      body.textContent = entry.detail;
+      detail.appendChild(body);
+    });
+  };
+
   const fire = (ids, { instant = false } = {}) => {
     const block = blocks.get(openMode);
     if (!ids.length) {
@@ -252,9 +333,7 @@ function initSimulator(scene) {
 
     if (hook) hook.textContent = MODE_LABELS[openMode] ?? '';
     clearReadout(instant ? '' : 'The force enters the brain…');
-    if (detail) {
-      detail.textContent = ids.length === 1 ? getSymptom(ids[0])?.detail ?? '' : '';
-    }
+    setDetail(beamIds);
 
     if (!scene) {
       beamIds.forEach(appendReadout);
@@ -279,16 +358,14 @@ function initSimulator(scene) {
     block.boxes.forEach((box) => {
       box.checked = false;
     });
-    block.chips.forEach((chip) => {
-      chip.setAttribute('aria-pressed', String(chip.dataset.symptomId === id));
-    });
+    block.group.setSelected([id]);
     fire([id]);
   };
 
   const selectCombination = (mode) => {
     const block = blocks.get(mode);
     if (!block) return;
-    block.chips.forEach((chip) => chip.setAttribute('aria-pressed', 'false'));
+    block.group.setSelected([]);
     fire(currentSelection(mode));
   };
 
@@ -329,13 +406,12 @@ function initSimulator(scene) {
 
     // Switching migraine type starts the reader from a clean slate.
     const block = blocks.get(mode);
-    block?.chips.forEach((chip) => chip.setAttribute('aria-pressed', 'false'));
+    block?.group.setSelected([]);
     block?.boxes.forEach((box) => {
       box.checked = false;
     });
     scene?.clearActive();
     clearReadout('Choose a symptom to follow the force through the brain.');
-    if (detail) detail.textContent = '';
   };
 
   triggers.forEach((trigger) => {
@@ -354,9 +430,7 @@ function initSimulator(scene) {
       setOpen(stored.mode, { restore: true });
       const block = blocks.get(stored.mode);
       if (valid.length === 1) {
-        block?.chips.forEach((chip) => {
-          chip.setAttribute('aria-pressed', String(chip.dataset.symptomId === valid[0]));
-        });
+        block?.group.setSelected(valid);
       } else {
         block?.boxes.forEach((box) => {
           box.checked = valid.includes(box.value);
@@ -374,6 +448,7 @@ function initReference(scene) {
   const detail = document.querySelector('[data-reference-detail]');
   const calloutLabel = document.querySelector('[data-callout-label]');
   const calloutCaption = document.querySelector('[data-callout-caption]');
+  const calloutAngle = document.querySelector('[data-callout-angle]');
   const nucleus = document.querySelector('#reference-callout .nucleus-zoom');
   if (!list) return;
 
@@ -382,13 +457,13 @@ function initReference(scene) {
     const structure = symptom && getStructure(symptom.structureId);
     if (!symptom || !structure) return;
 
-    buttons.forEach((button) => {
-      button.setAttribute('aria-pressed', String(button.dataset.symptomId === id));
-    });
+    group.setSelected([id]);
 
     // The chip already names the structure, so the panel updates at once here and
     // the line runs alongside it rather than gating the text.
     scene?.revealSymptoms([id], { instant: Boolean(options.instant) });
+
+    const { angle, elevation } = calloutGeometry(symptom.beamDir);
 
     if (name) name.textContent = readout(id);
     if (detail) detail.textContent = symptom.detail;
@@ -398,62 +473,100 @@ function initReference(scene) {
     if (calloutCaption) {
       calloutCaption.textContent = `${symptom.label}: the theory’s angle of force through the ${structure.name.toLowerCase()}.`;
     }
+    if (calloutAngle) {
+      calloutAngle.textContent = `${elevation} from axial`;
+    }
     if (nucleus) {
-      nucleus.style.setProperty('--beam-angle', CALLOUT_ANGLES[id] ?? '-28deg');
+      nucleus.style.setProperty('--beam-angle', angle);
     }
   };
 
-  const buttons = BEAM_DEFS.map((symptom) => {
-    const button = document.createElement('button');
-    button.className = 'chip';
-    button.type = 'button';
-    button.dataset.symptomId = symptom.id;
-    button.setAttribute('aria-pressed', 'false');
-    button.textContent = `${symptom.label} — ${getStructure(symptom.structureId)?.name ?? ''}`;
-    button.addEventListener('click', () => select(symptom.id));
-    button.addEventListener('keydown', (event) => {
-      const index = buttons.indexOf(button);
-      let next = null;
-      if (event.key === 'ArrowRight' || event.key === 'ArrowDown') next = (index + 1) % buttons.length;
-      else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') next = (index - 1 + buttons.length) % buttons.length;
-      else if (event.key === 'Home') next = 0;
-      else if (event.key === 'End') next = buttons.length - 1;
-      if (next !== null) {
-        event.preventDefault();
-        buttons[next].focus();
-      }
-    });
-    list.appendChild(button);
-    return button;
-  });
+  const group = buildChipGroup(
+    list,
+    BEAM_DEFS.map((symptom) => ({
+      id: symptom.id,
+      label: `${symptom.label} — ${getStructure(symptom.structureId)?.name ?? ''}`,
+    })),
+    { single: true, label: 'Prodrome Zone structures', onSelect: select },
+  );
 
   select(BEAM_DEFS[0].id, { instant: true });
 }
 
-function initAnglesModule(anglesScene) {
+const SEQUENCE_COMPLETE =
+  'Every angle has struck. The pineal is reached from its own upper-posterior direction.';
+
+function initAnglesModule(anglesScene, motionQuery) {
   const playButton = document.querySelector('[data-play-sequence]');
   const showAllButton = document.querySelector('[data-show-all]');
   const status = document.querySelector('[data-sequence-status]');
   if (!anglesScene) return;
 
-  playButton?.addEventListener('click', async () => {
-    playButton.disabled = true;
-    if (status) status.textContent = 'The force enters at each angle in turn.';
-    const completed = await anglesScene.playSequence(BEAM_SEQUENCE, {
-      onCross: (id) => {
-        if (status) status.textContent = readout(id);
-      },
-    });
-    if (completed && status) {
-      status.textContent = 'Every angle has struck. The pineal is reached from its own upper-posterior direction.';
+  let playing = false;
+  let step = 0;
+
+  const setStatus = (text) => {
+    if (status) status.textContent = text;
+  };
+
+  // With reduced motion there is nothing to play, so the button steps one angle at a
+  // time instead. That keeps it a different action from "Show all" and keeps its status
+  // line true — it never claims a sequence ran.
+  const stepped = () => motionQuery.matches;
+
+  const resetLabel = () => {
+    if (!playButton) return;
+    playButton.textContent = stepped() ? 'Next angle' : 'Play sequence';
+  };
+
+  const stepOnce = () => {
+    const id = BEAM_SEQUENCE[step];
+    anglesScene.showSingleAngle(id);
+    setStatus(readout(id));
+    step += 1;
+    if (step >= BEAM_SEQUENCE.length) {
+      step = 0;
+      setStatus(`${readout(id)} — ${SEQUENCE_COMPLETE}`);
     }
-    playButton.disabled = false;
+  };
+
+  const play = async () => {
+    playing = true;
+    if (playButton) playButton.textContent = 'Stop';
+    setStatus('The force enters at each angle in turn.');
+    const completed = await anglesScene.playSequence(BEAM_SEQUENCE, { onCross: (id) => setStatus(readout(id)) });
+    if (completed) setStatus(SEQUENCE_COMPLETE);
+    playing = false;
+    resetLabel();
+  };
+
+  playButton?.addEventListener('click', () => {
+    if (stepped()) {
+      stepOnce();
+      return;
+    }
+    if (playing) {
+      anglesScene.cancelSequence();
+      setStatus('Stopped.');
+      return;
+    }
+    play();
   });
 
   showAllButton?.addEventListener('click', () => {
+    if (playing) anglesScene.cancelSequence();
+    step = 0;
     anglesScene.showAllBeams();
-    if (status) status.textContent = 'Five angles, four targets: every path the force can take.';
+    setStatus('Five angles, four targets: every path the force can take.');
   });
+
+  resetLabel();
+  if (typeof motionQuery.addEventListener === 'function') {
+    motionQuery.addEventListener('change', () => {
+      step = 0;
+      resetLabel();
+    });
+  }
 }
 
 function initReducedMotionListener(scenes, motionQuery) {
@@ -475,6 +588,6 @@ export function initUI({ scenes, motionQuery }) {
   initNavigation();
   initSimulator(scenes.simulator);
   initReference(scenes.structures);
-  initAnglesModule(scenes.angles);
+  initAnglesModule(scenes.angles, motionQuery);
   initReducedMotionListener(Object.values(scenes), motionQuery);
 }

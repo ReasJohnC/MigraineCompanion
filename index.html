@@ -21,6 +21,11 @@
   <body>
     <a class="skip-link" href="#main">Skip to main content</a>
 
+    <p class="visually-hidden" id="stage-keys">
+      Interactive model. Use the arrow keys to rotate it, plus and minus to zoom, and zero to
+      return to the section’s view.
+    </p>
+
     <header class="site-header">
       <nav class="site-nav" aria-label="Primary navigation">
         <a class="brand" href="#hero" aria-label="Migraine Companion">
@@ -79,7 +84,9 @@
             <div
               class="brain-stage brain-stage--overview"
               data-brain="overview"
-              role="img"
+              role="application"
+              tabindex="0"
+              aria-describedby="stage-keys"
               aria-label="Rotatable 3D anatomical brain model highlighting the thalamus, hypothalamus, and pineal region with no force beam."
             >
               <div class="brain-loading">Loading brain model...</div>
@@ -142,7 +149,9 @@
               <div
                 class="brain-stage brain-stage--simulator"
                 data-brain="simulator"
-                role="img"
+                role="application"
+                tabindex="0"
+                aria-describedby="stage-keys"
                 aria-label="Rotatable 3D anatomical brain model. A fixed line runs through the selected structure while a cursor travels along it."
               >
                 <div class="brain-loading">Loading brain model...</div>
@@ -157,7 +166,7 @@
                   angle, and the structure it strikes is named as the force arrives.
                 </p>
               </div>
-              <p class="panel-detail" data-sim-detail></p>
+              <div class="panel-detail" data-sim-detail></div>
             </aside>
           </div>
         </div>
@@ -180,7 +189,9 @@
               <div
                 class="brain-stage brain-stage--structures"
                 data-brain="structures"
-                role="img"
+                role="application"
+                tabindex="0"
+                aria-describedby="stage-keys"
                 aria-label="Rotatable 3D anatomical brain model showing the selected structure and the angle of force that reaches it."
               >
                 <div class="brain-loading">Loading brain model...</div>
@@ -199,6 +210,7 @@
                 <div>
                   <p class="callout-label" data-callout-label>Inside the nucleus</p>
                   <p data-callout-caption>The angle of force through this structure.</p>
+                  <p class="callout-angle" data-callout-angle></p>
                 </div>
               </div>
             </aside>
@@ -237,7 +249,9 @@
             <div
               class="brain-stage brain-stage--angles"
               data-brain="angles"
-              role="img"
+              role="application"
+              tabindex="0"
+              aria-describedby="stage-keys"
               aria-label="Rotatable 3D anatomical brain model showing the distinct force angles as a sequence or fan."
             >
               <div class="brain-loading">Loading brain model...</div>

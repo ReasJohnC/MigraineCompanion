@@ -33,6 +33,10 @@ function bootstrap() {
     showSceneFallback('[data-brain="angles"]');
   }
 
+  // Exposed so ai/verify/check.mjs can assert scene state — stray beam cursors and
+  // reduced-motion stepping are invisible from the DOM alone.
+  window.__scenes = scenes;
+
   initUI({ scenes, motionQuery });
 }
 
