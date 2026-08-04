@@ -223,7 +223,7 @@ function initSimulator(scene) {
   const fire = (ids, { instant = false } = {}) => {
     const block = blocks.get(openMode);
     if (!ids.length) {
-      clearReadout('Choose a symptom to send an energy line through the brain.');
+      clearReadout('Choose a symptom to follow the force through the brain.');
       scene?.clearActive();
       return;
     }
@@ -231,7 +231,7 @@ function initSimulator(scene) {
     const beamIds = openMode === 'aura' ? [...ids, AURA_SYMPTOM.id] : [...ids];
 
     if (hook) hook.textContent = MODE_LABELS[openMode] ?? '';
-    clearReadout(instant ? '' : 'Energy line firing…');
+    clearReadout(instant ? '' : 'The force enters the brain…');
     if (detail) {
       detail.textContent = ids.length === 1 ? getSymptom(ids[0])?.detail ?? '' : '';
     }
@@ -314,7 +314,7 @@ function initSimulator(scene) {
       box.checked = false;
     });
     scene?.clearActive();
-    clearReadout('Choose a symptom to send an energy line through the brain.');
+    clearReadout('Choose a symptom to follow the force through the brain.');
     if (detail) detail.textContent = '';
   };
 
@@ -348,7 +348,7 @@ function initSimulator(scene) {
   }
 }
 
-function initReference() {
+function initReference(scene) {
   const list = document.querySelector('[data-reference-list]');
   const name = document.querySelector('[data-reference-name]');
   const detail = document.querySelector('[data-reference-detail]');
@@ -357,7 +357,7 @@ function initReference() {
   const nucleus = document.querySelector('#reference-callout .nucleus-zoom');
   if (!list) return;
 
-  const select = (id) => {
+  const select = (id, options = {}) => {
     const symptom = getSymptom(id);
     const structure = symptom && getStructure(symptom.structureId);
     if (!symptom || !structure) return;
@@ -366,10 +366,14 @@ function initReference() {
       button.setAttribute('aria-pressed', String(button.dataset.symptomId === id));
     });
 
+    // The chip already names the structure, so the panel updates at once here and
+    // the line runs alongside it rather than gating the text.
+    scene?.revealSymptoms([id], { instant: Boolean(options.instant) });
+
     if (name) name.textContent = readout(id);
     if (detail) detail.textContent = symptom.detail;
     if (calloutLabel) {
-      calloutLabel.textContent = `${structure.aka ?? structure.name} circular view`;
+      calloutLabel.textContent = `Inside the ${structure.aka ?? structure.name}`;
     }
     if (calloutCaption) {
       calloutCaption.textContent = `${symptom.label}: the theory’s angle of force through the ${structure.name.toLowerCase()}.`;
@@ -403,7 +407,7 @@ function initReference() {
     return button;
   });
 
-  select(BEAM_DEFS[0].id);
+  select(BEAM_DEFS[0].id, { instant: true });
 }
 
 function initAnglesModule(anglesScene) {
@@ -414,21 +418,21 @@ function initAnglesModule(anglesScene) {
 
   playButton?.addEventListener('click', async () => {
     playButton.disabled = true;
-    if (status) status.textContent = 'Playing each angle in turn.';
+    if (status) status.textContent = 'The force enters at each angle in turn.';
     const completed = await anglesScene.playSequence(BEAM_SEQUENCE, {
       onCross: (id) => {
         if (status) status.textContent = readout(id);
       },
     });
     if (completed && status) {
-      status.textContent = 'Sequence complete. The pineal line uses the upper-posterior special angle.';
+      status.textContent = 'Every angle has struck. The pineal is reached from its own upper-posterior direction.';
     }
     playButton.disabled = false;
   });
 
   showAllButton?.addEventListener('click', () => {
     anglesScene.showAllBeams();
-    if (status) status.textContent = 'All five angles are visible together as a fan.';
+    if (status) status.textContent = 'Five angles through one crossing: every path the force can take.';
   });
 }
 
@@ -450,7 +454,7 @@ export function initUI({ scenes, motionQuery }) {
   initCopy();
   initNavigation();
   initSimulator(scenes.simulator);
-  initReference();
+  initReference(scenes.structures);
   initAnglesModule(scenes.angles);
   initReducedMotionListener(Object.values(scenes), motionQuery);
 }

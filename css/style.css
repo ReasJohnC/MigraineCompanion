@@ -941,25 +941,8 @@ h3 {
 
 /* ---------- Structures reference ---------- */
 
-.reference-layout {
-  display: grid;
-  grid-template-columns: minmax(240px, 0.9fr) minmax(320px, 1.1fr);
-  gap: clamp(1.5rem, 4vw, 3.5rem);
-  align-items: start;
-}
-
-.reference-layout .chip-list {
-  flex-direction: column;
-  align-items: stretch;
-}
-
-.reference-layout .chip {
-  text-align: left;
-}
-
-.reference-panel {
-  border-left: 1px solid var(--line-strong);
-  padding-left: clamp(1.25rem, 3vw, 2rem);
+[data-reference-list] {
+  margin-bottom: clamp(1.5rem, 3vw, 2.4rem);
 }
 
 .reference-panel h3 {
@@ -1017,22 +1000,4 @@ h3 {
   height: 8px;
   border-radius: 50%;
   background: var(--accent);
-}
-
-@media (max-width: 880px) {
-  .reference-layout {
-    grid-template-columns: 1fr;
-  }
-
-  .reference-panel {
-    border-left: 0;
-    border-top: 1px solid var(--line-strong);
-    padding-left: 0;
-    padding-top: 1.4rem;
-  }
-
-  .reference-layout .chip-list {
-    flex-direction: row;
-    flex-wrap: wrap;
-  }
 }

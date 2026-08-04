@@ -84,30 +84,30 @@ export const BEAM_SEQUENCE = [...SYMPTOM_IDS, AURA_SYMPTOM.id];
 
 export const PAGE_COPY = {
   hero: {
-    eyebrow: 'Migraine Companion 1: Energy Impact Simulator',
+    eyebrow: 'Migraine Companion: Energy Impact Simulator',
     title: 'Welcome to the Neural Neighborhood of Migraine',
     thesis:
-      'This companion presents an illustration of the theory that migraine can begin when an energy force enters the deep-brain Migraine Prodrome Zone at specific angles. The simulator lets readers explore how different angle paths may map the different symptoms to the neural areas before the severe migraine pain begins.',
+      'Migraine can begin when an energy force enters the deep-brain Migraine Prodrome Zone at a specific angle. Different angles reach different neural clusters, and each cluster answers with its own warning symptom — arriving well before the severe migraine pain begins.',
     disclaimer: 'Always seek medical consultation concerning all headache and prodrome symptoms.',
   },
   prodromeZone: {
     title: 'The Migraine Prodrome Zone',
     hook: 'A newly identified brain region where the beginning of the migraine launches.',
     blurb:
-      'Currently migraine research has recognized certain prodrome symptoms. Major ones are changes in mood, fluid balance, gut motility, and alert status. An educated search for those regions in the brain revealed this zone. There are specialized neural clusters for specific actions located in the hypothalamus, thalamus, and pineal body = the Migraine Prodrome Zone. The companion’s image here shows these structures in a 3D view.',
+      'Currently migraine research has recognized certain prodrome symptoms. Major ones are changes in mood, fluid balance, gut motility, and alert status. An educated search for those regions in the brain revealed this zone. There are specialized neural clusters for specific actions located in the hypothalamus, thalamus, and pineal body = the Migraine Prodrome Zone. They sit close together, deep beneath the cortex — near neighbors in a very small neighborhood.',
     caption:
-      'This companion’s Migraine Prodrome Zone: thalamus, hypothalamus, and pineal region shown as the orientation point for the theory.',
+      'The Migraine Prodrome Zone: thalamus, hypothalamus, and pineal body, the deep-brain crossroads where an attack begins.',
   },
   pineal: {
     title: 'Pineal Body (Gland)',
     points: ['Circadian rhythm and wakefulness', 'Microcrystals and visual aura'],
     blurb:
-      'Established migraine research recognizes sleep disturbance, difficulty sleeping, fatigue, yawning, and alertness changes before migraine onset. Because the pineal gland helps time melatonin rhythms, it is a reasonable educational marker for circadian disruption, however, more so than changes in sleep pattern, a new theory emerges tying in the discovery of microcrystals to the migraine visual aura pattern.',
+      'Established migraine research recognizes sleep disturbance, difficulty sleeping, fatigue, yawning, and alertness changes before migraine onset. Because the pineal gland helps time melatonin rhythms, it is a natural site for circadian disruption; however, more so than changes in sleep pattern, a new theory emerges tying in the discovery of microcrystals to the migraine visual aura pattern.',
     theory:
       'In this theory, a force angle strikes the pineal and stimulates the pineal microcrystals in their hexagon shape with sharp edges to create the visual hallucination. For full details of this original new theory, see',
     bookTitle: 'On the Other Side of Migraine',
     caption:
-      'The pineal gland marks melatonin timing: established circadian biology, plus the special-angle migraine theory for the visual aura.',
+      'The pineal body times melatonin — and, struck at its own distinct angle, sets off the visual aura.',
   },
   angles: {
     hook: 'Many possible warning symptoms via prodromes.',

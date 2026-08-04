@@ -9,16 +9,28 @@ on-page text.
 Author's spelling of "Mood Alterations" follows "Text for JC_2"; the first document had
 "Alternations", confirmed as a typo.
 
+**Voice.** All copy describes what happens in the brain, not what the page is doing. Phrases
+like "this companion presents", "the simulator lets readers explore", and "shown here in a 3D
+view" were rewritten on John's instruction. Deliberately left alone: the author's book
+citations, the epistemic framing "The theory:" and "In this theory" (removing it would state a
+hypothesis as established fact), instructions that direct the reader ("Click all experienced
+for each attack"), and the `aria-label` descriptions on each 3D stage, which exist to describe
+the visual to screen-reader users and must stay literal.
+
 ## Opening
 
-- Over-title: **Migraine Companion 1: Energy Impact Simulator**
+- Over-title: **Migraine Companion: Energy Impact Simulator**
 - Heading: **Welcome to the Neural Neighborhood of Migraine**
 - Hero graphic: bullseye titled "Prodrome Zone" (replaced the migraine-phases timeline)
 
-This companion presents an illustration of the theory that migraine can begin when an energy
-force enters the deep-brain Migraine Prodrome Zone at specific angles. The simulator lets
-readers explore how different angle paths may map the different symptoms to the neural areas
-before the severe migraine pain begins.
+Migraine can begin when an energy force enters the deep-brain Migraine Prodrome Zone at a
+specific angle. Different angles reach different neural clusters, and each cluster answers
+with its own warning symptom — arriving well before the severe migraine pain begins.
+
+*(Author's original: "This companion presents an illustration of the theory that migraine can
+begin when an energy force enters the deep-brain Migraine Prodrome Zone at specific angles.
+The simulator lets readers explore how different angle paths may map the different symptoms to
+the neural areas before the severe migraine pain begins.")*
 
 *Always seek medical consultation concerning all headache and prodrome symptoms.*
 
@@ -29,11 +41,14 @@ before the severe migraine pain begins.
 Currently migraine research has recognized certain prodrome symptoms. Major ones are changes
 in mood, fluid balance, gut motility, and alert status. An educated search for those regions
 in the brain revealed this zone. There are specialized neural clusters for specific actions
-located in the hypothalamus, thalamus, and pineal body = the Migraine Prodrome Zone. The
-companion's image here shows these structures in a 3D view.
+located in the hypothalamus, thalamus, and pineal body = the Migraine Prodrome Zone. They sit
+close together, deep beneath the cortex — near neighbors in a very small neighborhood.
 
-**Caption:** This companion's Migraine Prodrome Zone: thalamus, hypothalamus, and pineal
-region shown as the orientation point for the theory.
+*(Final sentence replaces the author's "The companion's image here shows these structures in a
+3D view.")*
+
+**Caption:** The Migraine Prodrome Zone: thalamus, hypothalamus, and pineal body, the
+deep-brain crossroads where an attack begins.
 
 ## 02 — Energy Impact Simulator
 
@@ -56,7 +71,9 @@ Readout beside the image, symptom first:
 
 ## 03 — The Structures
 
-Tabs read symptom-first.
+Tabs read symptom-first, above a 3D model matching the other sections: selecting a tab reveals
+that structure and runs the angle of force that reaches it. The panel text updates immediately
+here rather than waiting for the cursor, because the tab already names the structure.
 
 **Mood Alterations - Lateral tuberal nucleus**
 The word "nucleus" in these areas is an anatomical term meaning a distinct cluster of
@@ -91,16 +108,19 @@ pineal body is the likely associated site.
 
 Established migraine research recognizes sleep disturbance, difficulty sleeping, fatigue,
 yawning, and alertness changes before migraine onset. Because the pineal gland helps time
-melatonin rhythms, it is a reasonable educational marker for circadian disruption, however,
-more so than changes in sleep pattern, a new theory emerges tying in the discovery of
-microcrystals to the migraine visual aura pattern.
+melatonin rhythms, it is a natural site for circadian disruption; however, more so than changes
+in sleep pattern, a new theory emerges tying in the discovery of microcrystals to the migraine
+visual aura pattern.
+
+*("a natural site" replaces the author's "a reasonable educational marker", which described the
+page's framing rather than the gland.)*
 
 In this theory, a force angle strikes the pineal and stimulates the pineal microcrystals in
 their hexagon shape with sharp edges to create the visual hallucination. For full details of
 this original new theory, see *On the Other Side of Migraine*.
 
-**Caption:** The pineal gland marks melatonin timing: established circadian biology, plus the
-special-angle migraine theory for the visual aura.
+**Caption:** The pineal body times melatonin — and, struck at its own distinct angle, sets off
+the visual aura.
 
 ## 05 — Angles of Force
 

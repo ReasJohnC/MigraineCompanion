@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Migraine Companion 1: Energy Impact Simulator</title>
+    <title>Migraine Companion: Energy Impact Simulator</title>
     <meta
       name="description"
       content="An interactive 3D companion that visualizes the Migraine Prodrome Zone and the angle-of-force migraine theory."
@@ -155,8 +155,8 @@
               <p class="panel-hook" id="sim-heading">No symptom selected</p>
               <div class="readout-list" data-readout aria-live="polite">
                 <p class="readout-empty">
-                  Open a section above and choose a symptom. Its name and brain region appear as the
-                  cursor reaches the structure.
+                  Open a section above and choose a symptom. The force enters at that symptom’s
+                  angle, and the structure it strikes is named as the force arrives.
                 </p>
               </div>
               <p class="panel-detail" data-sim-detail></p>
@@ -165,7 +165,7 @@
         </div>
       </section>
 
-      <section class="section" id="structures" aria-labelledby="structures-title">
+      <section class="section model-section" id="structures" aria-labelledby="structures-title">
         <div class="section-inner">
           <div class="section-heading">
             <p class="section-number">03</p>
@@ -175,10 +175,21 @@
             </p>
           </div>
 
-          <div class="reference-layout">
-            <div class="chip-list" data-reference-list role="group" aria-label="Prodrome Zone structures"></div>
+          <div class="chip-list" data-reference-list role="group" aria-label="Prodrome Zone structures"></div>
 
-            <div class="reference-panel">
+          <div class="interactive-layout">
+            <div class="module-column">
+              <div
+                class="brain-stage brain-stage--structures"
+                data-brain="structures"
+                role="img"
+                aria-label="Rotatable 3D anatomical brain model showing the selected structure and the angle of force that reaches it."
+              >
+                <div class="brain-loading">Loading brain model...</div>
+              </div>
+            </div>
+
+            <aside class="detail-panel reference-panel">
               <h3 id="reference-name" data-reference-name>Mood Alterations / Lateral tuberal nucleus</h3>
               <p id="reference-detail" data-reference-detail></p>
 
@@ -188,11 +199,11 @@
                   <span class="nucleus-beam"></span>
                 </div>
                 <div>
-                  <p class="callout-label" data-callout-label>Circular nucleus view</p>
+                  <p class="callout-label" data-callout-label>Inside the nucleus</p>
                   <p data-callout-caption>The angle of force through this structure.</p>
                 </div>
               </div>
-            </div>
+            </aside>
           </div>
         </div>
       </section>

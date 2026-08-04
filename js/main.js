@@ -24,10 +24,12 @@ function bootstrap() {
   try {
     scenes.overview = createScene('[data-brain="overview"]', 'overview', reducedMotion);
     scenes.simulator = createScene('[data-brain="simulator"]', 'simulator', reducedMotion);
+    scenes.structures = createScene('[data-brain="structures"]', 'structures', reducedMotion);
     scenes.angles = createScene('[data-brain="angles"]', 'angles', reducedMotion);
   } catch {
     showSceneFallback('[data-brain="overview"]');
     showSceneFallback('[data-brain="simulator"]');
+    showSceneFallback('[data-brain="structures"]');
     showSceneFallback('[data-brain="angles"]');
   }
 

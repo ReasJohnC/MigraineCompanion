@@ -28,7 +28,7 @@ python3 -m http.server 4173
 2. **The Migraine Prodrome Zone** (overview — thalamus/hypothalamus/pineal, no line)
 3. **Energy Impact Simulator** — Section 1 *Migraine without Aura*, Section 2 *Migraine With
    Aura*; four symptoms each, singly or in combination
-4. **The Structures** — reference catalogue, symptom-first
+4. **The Structures** — reference catalogue, symptom-first, with its own 3D model
 5. **Pineal Body (Gland)** — circadian rhythm, and microcrystals as the aura mechanism
 6. **Angles of Force** (capstone — play the sequence or show all lines together)
 
@@ -61,3 +61,7 @@ Still open: an Amazon link for *On the Other Side of Migraine*, deferred by the 
 - Respects `prefers-reduced-motion` (label and final state appear at once, no travel);
   keyboard-accessible; responsive down to mobile.
 - No backend, no analytics, no external data. State (last selection) is `localStorage` only.
+- Four WebGL contexts, one per model section. Simulator Sections 1 and 2 share a single scene.
+- Copy is written in the brain's voice, not the page's: it says what the force and the
+  structures do, never what the site is showing. See `content/00-site-copy.md` for what was
+  deliberately left in the page's voice and why.
