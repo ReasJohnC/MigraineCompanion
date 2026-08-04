@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import {
   BEAM_DEFS,
   BEAM_SEQUENCE,
@@ -9,6 +10,8 @@ import {
 } from './data.js';
 
 const ACCENT = 0xff7a45;
+// Cool is the instrument: an unstruck nucleus is a measurement, not a claim.
+const BIO = 0x41d4c8;
 const Y_AXIS = new THREE.Vector3(0, 1, 0);
 const CORTEX_BASE_COLOR = new THREE.Color(0xc79b93);
 const CORTEX_GYRUS_COLOR = new THREE.Color(0xe2b9ad);
@@ -27,19 +30,19 @@ const CORE_MARKERS = [
 // own keyframe until the selection clears.
 const CAMERA_PRESETS = {
   'lateral-tuberal': {
-    position: [1.22, 0.5, 1.42],
+    position: [1.62, 0.66, 1.89],
     target: [0.06, -0.18, 0.04],
   },
   paraventricular: {
-    position: [1.05, 0.62, 1.45],
+    position: [1.4, 0.82, 1.93],
     target: [0.03, -0.11, 0.02],
   },
   suprachiasmatic: {
-    position: [1.28, 0.48, 1.34],
+    position: [1.7, 0.64, 1.78],
     target: [0.13, -0.22, 0.02],
   },
   pineal: {
-    position: [1.14, 0.78, 1.62],
+    position: [1.52, 1.04, 2.16],
     target: [-0.26, 0.04, 0],
   },
 };
@@ -271,15 +274,241 @@ function writeColor(colors, index, color) {
   colors[offset + 2] = color.b;
 }
 
-function corticalFoldSignal(x, y, z) {
-  const warpA = fbmNoise3(x * 1.5 + 6.3, y * 1.7 - 3.7, z * 1.6 + 9.1, 3) - 0.5;
-  const warpB = fbmNoise3(x * 1.8 - 8.4, y * 1.4 + 12.8, z * 1.7 - 4.2, 3) - 0.5;
-  const bandA = Math.sin(x * 4.3 + y * 7.2 + z * 1.5 + warpA * 3.1);
-  const bandB = Math.sin(x * -3.1 + y * 2.2 + z * 7.8 + warpB * 2.8);
-  const bandC = Math.sin(x * 1.9 + y * 8.6 - z * 2.9 + (warpA + warpB) * 2.1);
-  const foldedBands = Math.max(1 - bandA * bandA, 1 - bandB * bandB, 1 - bandC * bandC);
-  const cellular = fbmNoise3(x * 3.1 + 2.7, y * 3.5 - 5.1, z * 3.3 + 1.6, 3);
-  return clamp(foldedBands * 0.66 + cellular * 0.34);
+// The cortex is built in two halves. The CPU shapes the silhouette — lobes, temporal
+// bulge, midline fissure, flattened base — because that geometry was tuned against the
+// author's coordinates and must not drift. The sulci are a displacement field evaluated
+// per vertex on the GPU, so the mesh carries a sixth of the triangles it used to and its
+// normals come from the field's own gradient rather than computeVertexNormals(), which is
+// what produced the visible facets and the wedge-shaped banding across the surface.
+const CORTEX_NOISE_GLSL = /* glsl */ `
+  float mcHash(vec3 p) {
+    return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453123);
+  }
+
+  float mcValueNoise(vec3 p) {
+    vec3 i = floor(p);
+    vec3 f = fract(p);
+    f = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+    return mix(
+      mix(
+        mix(mcHash(i), mcHash(i + vec3(1.0, 0.0, 0.0)), f.x),
+        mix(mcHash(i + vec3(0.0, 1.0, 0.0)), mcHash(i + vec3(1.0, 1.0, 0.0)), f.x),
+        f.y
+      ),
+      mix(
+        mix(mcHash(i + vec3(0.0, 0.0, 1.0)), mcHash(i + vec3(1.0, 0.0, 1.0)), f.x),
+        mix(mcHash(i + vec3(0.0, 1.0, 1.0)), mcHash(i + vec3(1.0, 1.0, 1.0)), f.x),
+        f.y
+      ),
+      f.z
+    );
+  }
+
+  float mcFbm(vec3 p) {
+    float value = 0.0;
+    float amplitude = 0.5;
+    float norm = 0.0;
+    for (int i = 0; i < 3; i += 1) {
+      value += mcValueNoise(p) * amplitude;
+      norm += amplitude;
+      amplitude *= 0.5;
+      p *= 2.03;
+    }
+    return value / norm;
+  }
+
+  // Warped sine bands crossed with cellular noise: gyri that wander rather than stripe.
+  float mcFold(vec3 p) {
+    float warpA = mcFbm(p * 1.5 + vec3(6.3, -3.7, 9.1)) - 0.5;
+    float warpB = mcFbm(p * 1.8 + vec3(-8.4, 12.8, -4.2)) - 0.5;
+    float a = sin(p.x * 4.3 + p.y * 7.2 + p.z * 1.5 + warpA * 3.1);
+    float b = sin(p.x * -3.1 + p.y * 2.2 + p.z * 7.8 + warpB * 2.8);
+    float c = sin(p.x * 1.9 + p.y * 8.6 - p.z * 2.9 + (warpA + warpB) * 2.1);
+    float bands = max(max(1.0 - a * a, 1.0 - b * b), 1.0 - c * c);
+    return clamp(bands * 0.66 + mcFbm(p * 3.1 + vec3(2.7, -5.1, 1.6)) * 0.34, 0.0, 1.0);
+  }
+
+  // Signed height of the cortical surface above its smooth base.
+  float mcRelief(vec3 p) {
+    float fold = mcFold(p);
+    float ridge = smoothstep(0.4, 0.92, fold);
+    float groove = 1.0 - smoothstep(0.12, 0.62, fold);
+    float mask = 1.0 - smoothstep(0.5, 0.96, -p.y);
+    return (ridge * 0.07 - groove * 0.082) * mask;
+  }
+`;
+
+// The cortex reads as a scan shell rather than a solid: near-transparent face-on so the
+// deep structures are actually visible — the original "you must be able to see inside"
+// requirement, which a 0.72-opacity solid never met — and bright at grazing angles, where
+// the silhouette does the describing. A slow drift of contour lines over the relief field
+// says "surface being measured" using the real geometry rather than decoration.
+function createCortexMaterial() {
+  const material = new THREE.MeshStandardMaterial({
+    color: 0xc8a79d,
+    roughness: 0.58,
+    metalness: 0,
+    transparent: true,
+    opacity: 1,
+    depthWrite: false,
+    side: THREE.FrontSide,
+  });
+
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.uTime = { value: 0 };
+
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        '#include <common>',
+        `#include <common>
+         varying float vRelief;
+         varying vec3 vSmoothNormal;
+         ${CORTEX_NOISE_GLSL}`,
+      )
+      .replace(
+        '#include <beginnormal_vertex>',
+        `#include <beginnormal_vertex>
+         float relief = mcRelief(position);
+         vRelief = relief;
+         vSmoothNormal = normalize(normalMatrix * objectNormal);
+         // Gradient of the relief field, tetrahedral taps. Subtracting its tangential
+         // part from the base normal gives the true surface normal analytically, so the
+         // shading has no facets to show.
+         const float e = 0.045;
+         vec2 k = vec2(1.0, -1.0);
+         vec3 grad = (
+           k.xyy * mcRelief(position + k.xyy * e) +
+           k.yyx * mcRelief(position + k.yyx * e) +
+           k.yxy * mcRelief(position + k.yxy * e) +
+           k.xxx * mcRelief(position + k.xxx * e)
+         ) / (4.0 * e);
+         objectNormal = normalize(objectNormal - (grad - dot(grad, objectNormal) * objectNormal));`,
+      )
+      .replace(
+        '#include <begin_vertex>',
+        `#include <begin_vertex>
+         transformed += normal * relief;`,
+      );
+
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        '#include <common>',
+        `#include <common>
+         uniform float uTime;
+         varying float vRelief;
+         varying vec3 vSmoothNormal;`,
+      )
+      .replace(
+        '#include <dithering_fragment>',
+        `#include <dithering_fragment>
+         float facing = abs(dot(normalize(vSmoothNormal), normalize(vViewPosition)));
+         float fresnel = pow(1.0 - facing, 2.4);
+         // Contour bands on the relief field, drifting slowly.
+         float contour = abs(fract(vRelief * 19.0 - uTime * 0.05) - 0.5) * 2.0;
+         float isoline = (1.0 - smoothstep(0.0, 0.4, contour)) * 0.4;
+         gl_FragColor.rgb += vec3(0.24, 0.62, 0.6) * isoline * (0.4 + fresnel);
+         gl_FragColor.rgb += vec3(1.0, 0.74, 0.62) * pow(fresnel, 1.6) * 0.62;
+         gl_FragColor.a *= mix(0.17, 0.95, fresnel) + isoline * 0.2;`,
+      );
+
+    material.userData.shader = shader;
+  };
+
+  return material;
+}
+
+// Deep tissue seen through the shell: warm forward scattering, a cool ambient wrap and a
+// soft rim, so the thalamus and its neighbours read as bodies with volume rather than as
+// stickers pasted onto the surface.
+function createDeepTissueMaterial(color, options = {}) {
+  const material = new THREE.MeshStandardMaterial({
+    color,
+    roughness: options.roughness ?? 0.52,
+    metalness: 0,
+    transparent: true,
+    opacity: options.opacity ?? 0.92,
+    emissive: options.emissive ?? 0x2a1410,
+    emissiveIntensity: options.emissiveIntensity ?? 0.35,
+    depthWrite: false,
+    side: THREE.FrontSide,
+  });
+
+  material.onBeforeCompile = (shader) => {
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <dithering_fragment>',
+      `#include <dithering_fragment>
+       float facing = abs(dot(normalize(vNormal), normalize(vViewPosition)));
+       float rim = pow(1.0 - facing, 3.0);
+       gl_FragColor.rgb += vec3(0.45, 0.72, 0.78) * rim * 0.55;
+       gl_FragColor.a = min(1.0, gl_FragColor.a + rim * 0.25);`,
+    );
+  };
+
+  return material;
+}
+
+// The force, as an instrument trace rather than a plastic tube. Brightness peaks along
+// the tube's centre line instead of its silhouette, so it reads as a filament with a soft
+// edge; a gaussian travelling along the length is the charge propagating, and it vanishes
+// when nothing is in flight.
+function createBeamMaterial({ color, width, intensity }) {
+  return new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    fog: false,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide,
+    uniforms: {
+      uColor: { value: new THREE.Color(color) },
+      uHot: { value: new THREE.Color(0xffd9a8) },
+      uWidth: { value: width },
+      uIntensity: { value: intensity },
+      // Position of the travelling pulse along the beam, or below zero for none.
+      uPulse: { value: -1 },
+    },
+    vertexShader: /* glsl */ `
+      varying vec2 vUv;
+      varying vec3 vNormal;
+      varying vec3 vView;
+      void main() {
+        vUv = uv;
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        vNormal = normalize(normalMatrix * normal);
+        vView = -mv.xyz;
+        gl_Position = projectionMatrix * mv;
+      }
+    `,
+    fragmentShader: /* glsl */ `
+      uniform vec3 uColor;
+      uniform vec3 uHot;
+      uniform float uWidth;
+      uniform float uIntensity;
+      uniform float uPulse;
+      varying vec2 vUv;
+      varying vec3 vNormal;
+      varying vec3 vView;
+
+      void main() {
+        // Facing the camera is the middle of the tube; grazing is its edge.
+        float facing = abs(dot(normalize(vNormal), normalize(vView)));
+        float core = pow(facing, uWidth);
+        float glow = pow(facing, uWidth * 0.22) * 0.35;
+
+        float pulse = 0.0;
+        if (uPulse >= 0.0) {
+          float d = (vUv.y - uPulse) * 13.0;
+          pulse = exp(-d * d);
+          // A short wake trailing the front, never ahead of it.
+          pulse += exp(-abs(d) * 2.6) * step(vUv.y, uPulse) * 0.4;
+        }
+
+        vec3 tint = mix(uColor, uHot, min(1.0, core * 0.55 + pulse));
+        float alpha = (core + glow) * uIntensity + pulse * 0.85;
+        if (alpha <= 0.001) discard;
+        gl_FragColor = vec4(tint, min(1.0, alpha));
+      }
+    `,
+  });
 }
 
 // Both caches hand out clones and never the cached object itself, so a scene disposing
@@ -287,28 +516,13 @@ function corticalFoldSignal(x, y, z) {
 let cerebrumGeoCache = null;
 function createCerebrumGeometry() {
   if (cerebrumGeoCache) return cerebrumGeoCache.clone();
-  const geometry = new THREE.IcosahedronGeometry(1, 60);
+  // 33,620 triangles against the old 74,420: enough that the contour bands span several
+  // of them rather than breaking along their edges, at less than half the cost.
+  const geometry = new THREE.IcosahedronGeometry(1, 40);
   const position = geometry.attributes.position;
-  const colors = new Float32Array(position.count * 3);
   const unit = new THREE.Vector3();
-  const color = new THREE.Color();
-  const vertexCache = new Map();
 
   for (let i = 0; i < position.count; i += 1) {
-    const originalX = position.getX(i);
-    const originalY = position.getY(i);
-    const originalZ = position.getZ(i);
-    const cacheKey = `${originalX.toFixed(5)}:${originalY.toFixed(5)}:${originalZ.toFixed(5)}`;
-    const cached = vertexCache.get(cacheKey);
-
-    if (cached) {
-      position.setXYZ(i, cached[0], cached[1], cached[2]);
-      colors[i * 3] = cached[3];
-      colors[i * 3 + 1] = cached[4];
-      colors[i * 3 + 2] = cached[5];
-      continue;
-    }
-
     unit.fromBufferAttribute(position, i).normalize();
     const x = unit.x;
     const y = unit.y;
@@ -330,17 +544,6 @@ function createCerebrumGeometry() {
     let py = y * radiusY - temporalLobe * 0.052;
     let pz = z * radiusZ * (1 + temporalLobe * 0.05);
 
-    const foldMask = 1 - smoothstep(0.5, 0.96, -y);
-    const fold = corticalFoldSignal(px, py, pz);
-    const ridge = smoothstep(0.4, 0.92, fold);
-    const groove = 1 - smoothstep(0.12, 0.62, fold);
-    const fine = fbmNoise3(px * 5.4 + 3.8, py * 5.2 - 2.1, pz * 5.6 + 8.6, 2) - 0.5;
-    const displacement = (ridge * 0.07 - groove * 0.082 + fine * 0.006) * foldMask;
-
-    px += unit.x * displacement;
-    py += unit.y * displacement;
-    pz += unit.z * displacement;
-
     const fissure =
       (1 - smoothstep(0.012, 0.15, absZ)) *
       dorsal *
@@ -354,19 +557,20 @@ function createCerebrumGeometry() {
     }
 
     position.setXYZ(i, px, py, pz);
-
-    const sulcusDepth = clamp(groove * 0.76 + fissure * 0.64);
-    color.copy(CORTEX_BASE_COLOR).lerp(CORTEX_GYRUS_COLOR, ridge * 0.48);
-    color.lerp(CORTEX_SULCUS_COLOR, sulcusDepth * 0.72);
-    writeColor(colors, i, color);
-    vertexCache.set(cacheKey, [px, py, pz, color.r, color.g, color.b]);
   }
 
-  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  geometry.computeVertexNormals();
-  geometry.computeBoundingSphere();
-  cerebrumGeoCache = geometry;
-  return geometry.clone();
+  // IcosahedronGeometry is non-indexed: every triangle owns its three corners, so
+  // computeVertexNormals() hands each vertex its own face's normal. Displacing along
+  // those in the shader pushes neighbouring triangles apart and the mesh splits open
+  // along every edge — the dark lattice that read as a wireframe over the cortex.
+  // Merging the duplicates first gives shared vertices, smooth normals, and a surface
+  // the relief field can lift without tearing.
+  const merged = mergeVertices(geometry);
+  geometry.dispose();
+  merged.computeVertexNormals();
+  merged.computeBoundingSphere();
+  cerebrumGeoCache = merged;
+  return merged.clone();
 }
 
 let cerebellumGeoCache = null;
@@ -425,10 +629,12 @@ function createCerebellumGeometry() {
   }
 
   geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  geometry.computeVertexNormals();
-  geometry.computeBoundingSphere();
-  cerebellumGeoCache = geometry;
-  return geometry.clone();
+  const merged = mergeVertices(geometry);
+  geometry.dispose();
+  merged.computeVertexNormals();
+  merged.computeBoundingSphere();
+  cerebellumGeoCache = merged;
+  return merged.clone();
 }
 
 function createBrainstemGeometry() {
@@ -481,6 +687,7 @@ export class BrainScene {
 
     this.scene = new THREE.Scene();
     this.scene.background = null;
+    this.scene.fog = new THREE.Fog(0x05070d, 2.2, 6.4);
 
     this.camera = new THREE.PerspectiveCamera(38, 1, 0.1, 20);
     this.renderer = new THREE.WebGLRenderer({
@@ -613,7 +820,7 @@ export class BrainScene {
     const preset = CAMERA_PRESETS[structureId];
     if (!preset) return;
     this.focusPose = true;
-    this.setRigPose({ ...preset, fov: 32 });
+    this.setRigPose({ ...preset, fov: 34 });
   }
 
   // Holds a section's own keyframe against further scrolling. The capstone needs this:
@@ -703,11 +910,8 @@ export class BrainScene {
   }
 
   createBrain() {
-    const cortexMaterial = makeTissueMaterial(0xffffff, 0.72, {
-      roughness: 0.9,
-      vertexColors: true,
-      side: THREE.FrontSide,
-    });
+    const cortexMaterial = createCortexMaterial();
+    this.cortexMaterial = cortexMaterial;
     const cerebellumMaterial = makeTissueMaterial(0xffffff, 0.59, {
       roughness: 0.86,
       vertexColors: true,
@@ -825,51 +1029,52 @@ export class BrainScene {
   }
 
   createInteractiveMarkers() {
-    const markerGeometry = new THREE.SphereGeometry(0.038, 32, 16);
-    const haloGeometry = new THREE.SphereGeometry(0.098, 32, 16);
+    const coreGeometry = new THREE.SphereGeometry(0.02, 24, 12);
+    const shellGeometry = new THREE.SphereGeometry(0.062, 24, 12);
 
     STRUCTURES.forEach((structure) => {
       const markerGroup = new THREE.Group();
       markerGroup.position.copy(vectorFromArray(structure.position));
-      markerGroup.visible = false;
 
       const coreMaterial = new THREE.MeshBasicMaterial({
-        color: ACCENT,
+        color: BIO,
         transparent: true,
-        opacity: 0.96,
+        opacity: 0.75,
         depthWrite: false,
+        fog: false,
       });
-      const core = new THREE.Mesh(markerGeometry, coreMaterial);
+      const core = new THREE.Mesh(coreGeometry, coreMaterial);
       core.renderOrder = 10;
       markerGroup.add(core);
 
-      const haloMaterial = new THREE.MeshBasicMaterial({
-        color: ACCENT,
+      const shellMaterial = new THREE.MeshBasicMaterial({
+        color: BIO,
         transparent: true,
-        opacity: 0.18,
+        opacity: 0.1,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
+        fog: false,
       });
-      const halo = new THREE.Mesh(haloGeometry, haloMaterial);
-      halo.renderOrder = 9;
-      markerGroup.add(halo);
+      const shell = new THREE.Mesh(shellGeometry, shellMaterial);
+      shell.renderOrder = 9;
+      markerGroup.add(shell);
 
       this.root.add(markerGroup);
       this.markers.set(structure.id, {
         group: markerGroup,
         core,
-        halo,
+        shell,
         coreMaterial,
-        haloMaterial,
+        shellMaterial,
+        active: false,
       });
     });
   }
 
   createBeams() {
-    const beamGeometry = new THREE.CylinderGeometry(1, 1, 1, 28, 1, true);
-    const flareGeometry = new THREE.SphereGeometry(0.075, 32, 16);
-    const cursorGeometry = new THREE.SphereGeometry(0.034, 24, 16);
-    const cursorHaloGeometry = new THREE.SphereGeometry(0.082, 24, 16);
+    const beamGeometry = new THREE.CylinderGeometry(1, 1, 1, 24, 1, true);
+    const flareGeometry = new THREE.SphereGeometry(0.06, 24, 12);
+    const ringGeometry = new THREE.RingGeometry(0.86, 1, 48);
 
     BEAM_DEFS.forEach((symptom) => {
       const structure = getStructure(symptom.structureId);
@@ -881,19 +1086,14 @@ export class BrainScene {
       const travel = sourceAxis.clone().multiplyScalar(-1).normalize();
       const fullLength = 3.04;
       const quaternion = new THREE.Quaternion().setFromUnitVectors(Y_AXIS, travel);
+      const crossings = hullCrossings(source, travel, fullLength);
 
       const group = new THREE.Group();
       group.visible = false;
 
-      // The line never changes length; because its midpoint is the target, a
-      // cursor travelling 0 to 1 crosses the structure at exactly 0.5.
-      const haloMaterial = new THREE.MeshBasicMaterial({
-        color: ACCENT,
-        transparent: true,
-        opacity: 0.1,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-      });
+      // The line never changes length; because its midpoint is the target, the pulse
+      // travelling 0 to 1 crosses the structure at exactly 0.5.
+      const haloMaterial = createBeamMaterial({ color: ACCENT, width: 1.1, intensity: 0.16 });
       const halo = new THREE.Mesh(beamGeometry, haloMaterial);
       halo.position.copy(target);
       halo.quaternion.copy(quaternion);
@@ -901,66 +1101,61 @@ export class BrainScene {
       halo.renderOrder = 11;
       group.add(halo);
 
-      const coreMaterial = new THREE.MeshBasicMaterial({
-        color: ACCENT,
-        transparent: true,
-        opacity: 0.32,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-      });
+      const coreMaterial = createBeamMaterial({ color: ACCENT, width: 5.5, intensity: 0.9 });
       const core = new THREE.Mesh(beamGeometry, coreMaterial);
       core.position.copy(target);
       core.quaternion.copy(quaternion);
-      core.scale.set(0.011, fullLength, 0.011);
+      core.scale.set(0.016, fullLength, 0.016);
       core.renderOrder = 12;
       group.add(core);
 
-      const sourceMaterial = new THREE.MeshBasicMaterial({
-        color: ACCENT,
-        transparent: true,
-        opacity: 0.16,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-      });
-      const sourceGlow = new THREE.Mesh(flareGeometry, sourceMaterial);
-      sourceGlow.position.copy(source);
-      sourceGlow.renderOrder = 13;
-      group.add(sourceGlow);
-
-      const flareMaterial = new THREE.MeshBasicMaterial({
-        color: ACCENT,
+      // Where the force crosses into the tissue. Without this the entry happens off
+      // screen and "the force enters from outside" is a claim the picture never shows.
+      const entryMaterial = new THREE.MeshBasicMaterial({
+        color: 0xffd9a8,
         transparent: true,
         opacity: 0,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
+        fog: false,
+        side: THREE.DoubleSide,
+      });
+      const entryRing = new THREE.Mesh(ringGeometry, entryMaterial);
+      entryRing.position.copy(
+        source.clone().add(travel.clone().multiplyScalar(fullLength * (crossings?.entry ?? 0.35))),
+      );
+      entryRing.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), travel));
+      entryRing.scale.setScalar(0.14);
+      entryRing.renderOrder = 13;
+      group.add(entryRing);
+
+      const flareMaterial = new THREE.MeshBasicMaterial({
+        color: 0xffd9a8,
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        fog: false,
       });
       const flare = new THREE.Mesh(flareGeometry, flareMaterial);
       flare.position.copy(target);
       flare.renderOrder = 14;
       group.add(flare);
 
-      const cursorHaloMaterial = new THREE.MeshBasicMaterial({
+      // A shockwave expanding from the struck nucleus, timed to the readout line.
+      const shockMaterial = new THREE.MeshBasicMaterial({
         color: ACCENT,
         transparent: true,
-        opacity: 0.22,
+        opacity: 0,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
+        fog: false,
+        side: THREE.DoubleSide,
       });
-      const cursorHalo = new THREE.Mesh(cursorHaloGeometry, cursorHaloMaterial);
-      cursorHalo.renderOrder = 15;
-      group.add(cursorHalo);
-
-      const cursorMaterial = new THREE.MeshBasicMaterial({
-        color: 0xfff2e6,
-        transparent: true,
-        opacity: 0.98,
-        depthWrite: false,
-      });
-      const cursor = new THREE.Mesh(cursorGeometry, cursorMaterial);
-      cursor.renderOrder = 16;
-      group.add(cursor);
-
-      const crossings = hullCrossings(source, travel, fullLength);
+      const shock = new THREE.Mesh(ringGeometry, shockMaterial);
+      shock.position.copy(target);
+      shock.renderOrder = 15;
+      group.add(shock);
 
       this.root.add(group);
       this.beams.set(symptom.id, {
@@ -974,16 +1169,14 @@ export class BrainScene {
         exitProgress: crossings?.exit ?? 1,
         core,
         halo,
-        sourceGlow,
+        entryRing,
         flare,
-        cursor,
-        cursorHalo,
+        shock,
         coreMaterial,
         haloMaterial,
-        sourceMaterial,
+        entryMaterial,
         flareMaterial,
-        cursorMaterial,
-        cursorHaloMaterial,
+        shockMaterial,
       });
       this.setBeamCursor(symptom.id, 0);
     });
@@ -1074,16 +1267,30 @@ export class BrainScene {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, cap));
   }
 
-  setMarkerVisible(id, visible) {
+  // Every nucleus stays on screen. A struck one burns warm; the rest hold as dim cool
+  // points, so the reader can see the whole neighbourhood and what the force did *not*
+  // reach — which is the section's actual argument.
+  setMarkerVisible(id, active) {
     const marker = this.markers.get(id);
     if (!marker) return;
-    marker.group.visible = visible;
-    marker.coreMaterial.opacity = visible ? 0.96 : 0;
-    marker.haloMaterial.opacity = visible ? 0.18 : 0;
+    marker.active = Boolean(active);
+    marker.coreMaterial.color.set(active ? 0xffd9a8 : BIO);
+    marker.shellMaterial.color.set(active ? ACCENT : BIO);
+    marker.coreMaterial.opacity = active ? 1 : 0.42;
+    marker.core.scale.setScalar(active ? 1.5 : 1);
   }
 
   hideMarkers() {
     this.markers.forEach((_, id) => this.setMarkerVisible(id, false));
+  }
+
+  // A slow breath on the struck nucleus; the others sit still.
+  updateMarkers(now) {
+    const breath = 0.5 + 0.5 * Math.sin(now / 620);
+    this.markers.forEach((marker) => {
+      marker.shellMaterial.opacity = marker.active ? 0.16 + breath * 0.2 : 0.07;
+      marker.shell.scale.setScalar(marker.active ? 1 + breath * 0.35 : 0.8);
+    });
   }
 
   setBeamVisible(id, visible) {
@@ -1092,17 +1299,21 @@ export class BrainScene {
     beam.group.visible = visible;
     if (!visible) {
       beam.flareMaterial.opacity = 0;
+      beam.entryMaterial.opacity = 0;
+      beam.shockMaterial.opacity = 0;
       this.setCursorVisible(id, false);
     }
   }
 
-  // The cursor means "the force is travelling right now". Anything else — a resolved
-  // strike, the capstone fan — has no cursor, so none is ever left parked in open space.
+  // The pulse means "the force is travelling right now". Anything else — a resolved
+  // strike, the capstone fan — carries no pulse, so nothing is ever left mid-flight.
   setCursorVisible(id, visible) {
     const beam = this.beams.get(id);
-    if (!beam) return;
-    beam.cursor.visible = visible;
-    beam.cursorHalo.visible = visible;
+    if (!beam || visible) return;
+    beam.coreMaterial.uniforms.uPulse.value = -1;
+    beam.haloMaterial.uniforms.uPulse.value = -1;
+    beam.entryMaterial.opacity = 0;
+    beam.shockMaterial.opacity = 0;
   }
 
   setBeamCursor(id, progress) {
@@ -1110,29 +1321,35 @@ export class BrainScene {
     if (!beam) return;
 
     const timeline = clamp(progress);
-    // The outbound half is compressed so the cursor stops at the far cortical surface
+    // The outbound half is compressed so the pulse stops at the far cortical surface
     // instead of continuing into open air on the other side of the head.
     const travelled =
       timeline <= 0.5 ? timeline : 0.5 + (timeline - 0.5) * (beam.exitProgress - 0.5) * 2;
-    const point = beam.source
-      .clone()
-      .add(beam.travel.clone().multiplyScalar(beam.fullLength * travelled));
+    beam.coreMaterial.uniforms.uPulse.value = travelled;
+    beam.haloMaterial.uniforms.uPulse.value = travelled;
 
-    beam.cursor.position.copy(point);
-    beam.cursorHalo.position.copy(point);
+    // The entry ring blooms as the force crosses the cortical surface.
+    const atEntry = 1 - clamp(Math.abs(travelled - beam.entryProgress) / 0.09);
+    const entry = smoothstep(0, 1, atEntry);
+    beam.entryMaterial.opacity = 0.85 * entry;
+    beam.entryRing.scale.setScalar(0.1 + 0.13 * (1 - entry));
 
-    // Everything brightens as the cursor passes through the structure.
+    // Everything brightens as the pulse passes through the structure.
     const nearness = 1 - clamp(Math.abs(timeline - 0.5) / 0.14);
     const strength = smoothstep(0, 1, nearness);
-    beam.flareMaterial.opacity = 0.34 * strength;
-    beam.flare.scale.setScalar(1 + 2.6 * strength);
-    beam.cursorHaloMaterial.opacity = 0.2 + 0.42 * strength;
-    beam.cursorHalo.scale.setScalar(1 + 0.5 * strength);
-    beam.coreMaterial.opacity = 0.3 + 0.24 * strength;
+    beam.flareMaterial.opacity = 0.6 * strength;
+    beam.flare.scale.setScalar(1 + 2.2 * strength);
+    beam.coreMaterial.uniforms.uIntensity.value = 0.7 + 0.5 * strength;
+
+    // The shockwave leaves the nucleus once the force has arrived, and only then.
+    const wave = clamp((timeline - 0.5) / 0.3);
+    beam.shockMaterial.opacity = wave > 0 ? 0.5 * (1 - wave) : 0;
+    beam.shock.scale.setScalar(0.06 + wave * 0.44);
+    beam.shock.quaternion.copy(this.camera.quaternion);
   }
 
   // The look a beam holds once the force has passed through: lit at the structure, no
-  // cursor. The flare is additive and the four targets sit within about 0.3 units of each
+  // pulse. The flare is additive and the four targets sit within about 0.3 units of each
   // other, so several at once stack into one white blob — beams shown together decay to a
   // thin trace instead, and the fan reads as distinct paths.
   setBeamResolved(id, { flare = true } = {}) {
@@ -1140,10 +1357,10 @@ export class BrainScene {
     if (!beam) return;
     this.setBeamVisible(id, true);
     this.setCursorVisible(id, false);
-    beam.flareMaterial.opacity = flare ? 0.34 : 0;
-    beam.flare.scale.setScalar(flare ? 3.6 : 1);
-    beam.coreMaterial.opacity = flare ? 0.54 : 0.4;
-    beam.haloMaterial.opacity = flare ? 0.1 : 0.055;
+    beam.flareMaterial.opacity = flare ? 0.55 : 0;
+    beam.flare.scale.setScalar(flare ? 2.6 : 1);
+    beam.coreMaterial.uniforms.uIntensity.value = flare ? 0.85 : 0.5;
+    beam.haloMaterial.uniforms.uIntensity.value = flare ? 0.16 : 0.08;
   }
 
   hideBeams() {
@@ -1330,7 +1547,11 @@ export class BrainScene {
     this.delta = Math.min(0.05, (now - (this.lastFrame ?? now - 16)) / 1000);
     this.lastFrame = now;
 
+    const shader = this.cortexMaterial?.userData.shader;
+    if (shader) shader.uniforms.uTime.value = now / 1000;
+
     this.tickBeams(now);
+    this.updateMarkers(now);
     this.updateRig(now);
     this.controls?.update();
     this.updateLabels();
