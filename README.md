@@ -8,7 +8,9 @@ producing different prodrome (pre-migraine) symptoms.
 ## What's here
 - `index.html`, `css/`, `js/`, `assets/` — the site (100% static; Three.js loaded via CDN).
 - `content/` — source draft copy per structure (the site text is built from these).
-- `BUILD-SPEC.md` — the build specification the site was implemented against.
+- `BUILD-SPEC.md` — the build specification, updated for the dark-instrument direction.
+- `ai/plans/` — the 2026-08-03 audit and redesign plan. `ai/verify/` — the harness that
+  measures it (`node ai/verify/check.mjs`).
 - `*.sh` — Codex fan-out helper scripts used during the build (not needed to run the site).
 
 ## Run locally
@@ -24,13 +26,15 @@ python3 -m http.server 4173
 - No build command. **Publish directory: `.`** (repo root). See `netlify.toml`.
 
 ## The sections
-1. **Opening** — title, thesis, medical note, "Prodrome Zone" bullseye
-2. **The Migraine Prodrome Zone** (overview — thalamus/hypothalamus/pineal, no line)
-3. **Energy Impact Simulator** — Section 1 *Migraine without Aura*, Section 2 *Migraine With
-   Aura*; four symptoms each, singly or in combination
-4. **The Structures** — reference catalogue, symptom-first, with its own 3D model
-5. **Pineal Body (Gland)** — circadian rhythm, and microcrystals as the aura mechanism
-6. **Angles of Force** (capstone — play the sequence or show all lines together)
+The page numbers them 01-05, after an unnumbered opening.
+
+- **Opening** — title, thesis, medical note, "Prodrome Zone" bullseye
+- **01 The Migraine Prodrome Zone** (overview — thalamus/hypothalamus/pineal, no line)
+- **02 Energy Impact Simulator** — *Migraine without Aura* / *Migraine with Aura*; four
+  symptoms each, singly or in combination
+- **03 The Structures** — reference catalogue, symptom-first
+- **04 Pineal Body (Gland)** — circadian rhythm, and microcrystals as the aura mechanism
+- **05 Angles of Force** (capstone — play the sequence or show all lines together)
 
 ## Symptoms and anatomy
 Symptoms own the angle; structures own the position. Mood Alterations and Gut Motility both
@@ -61,7 +65,11 @@ Still open: an Amazon link for *On the Other Side of Migraine*, deferred by the 
 - Respects `prefers-reduced-motion` (label and final state appear at once, no travel);
   keyboard-accessible; responsive down to mobile.
 - No backend, no analytics, no external data. State (last selection) is `localStorage` only.
-- Four WebGL contexts, one per model section. Simulator Sections 1 and 2 share a single scene.
+- **One WebGL context** for the whole page: a fixed, full-bleed canvas behind the document,
+  with the camera driven along a spline through per-section keyframes as you scroll.
+- The panels state the model's real numbers — target, position, entry vector, entry angle,
+  and the measured pineal clearance — so the author's hard constraint is something the
+  reader can watch hold rather than take on trust.
 - Copy is written in the brain's voice, not the page's: it says what the force and the
   structures do, never what the site is showing. See `content/00-site-copy.md` for what was
   deliberately left in the page's voice and why.

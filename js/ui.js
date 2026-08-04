@@ -4,8 +4,10 @@ import {
   BEAM_SEQUENCE,
   PAGE_COPY,
   SYMPTOMS,
+  angleBetween,
   getStructure,
   getSymptom,
+  pinealClearance,
   readout,
 } from './data.js';
 
@@ -30,6 +32,60 @@ function calloutGeometry(beamDir) {
   const bearing = (Math.atan2(-y, x) * 180) / Math.PI;
   const elevation = (Math.asin(Math.abs(y)) * 180) / Math.PI;
   return { angle: `${bearing.toFixed(1)}deg`, elevation: `${elevation.toFixed(1)}°` };
+}
+
+const sign = (value) => `${value < 0 ? '\u2212' : '+'}${Math.abs(value).toFixed(3)}`;
+
+// Every figure here already exists in data.js or falls out of the geometry. Surfacing
+// them is the honest version of looking advanced: the reader can check the model rather
+// than take it on trust. The clearance row in particular turns the author's one hard
+// constraint from an invisible promise into something they can watch hold.
+function buildHud(container, symptomId) {
+  const symptom = getSymptom(symptomId);
+  const structure = symptom && getStructure(symptom.structureId);
+  container.replaceChildren();
+  if (!symptom || !structure) return;
+
+  const rows = [];
+  rows.push(['TARGET', `${structure.name}${structure.aka ? `  ·  “${structure.aka}”` : ''}`]);
+  rows.push(['POSITION', structure.position.map((v, i) => `${'xyz'[i]} ${sign(v)}`).join('   ')]);
+  rows.push(['VECTOR', `\u27e8 ${symptom.beamDir.map(sign).join(', ')} \u27e9`]);
+
+  const elevation = (Math.asin(Math.abs(symptom.beamDir[1])) * 180) / Math.PI;
+  const entry = [`${elevation.toFixed(1)}° from axial`];
+  // The two lateral tuberal symptoms are deliberately spread through one nucleus, so the
+  // separation is worth stating where it applies.
+  const sibling = BEAM_DEFS.find(
+    (other) => other.id !== symptom.id && other.structureId === symptom.structureId,
+  );
+  if (sibling) {
+    entry.push(`${angleBetween(symptom.id, sibling.id).toFixed(1)}° from the ${sibling.label.toLowerCase()} path`);
+  }
+  rows.push(['ENTRY', entry.join('  ·  ')]);
+
+  const clearance = pinealClearance(symptomId);
+  if (clearance) {
+    rows.push([
+      'PINEAL',
+      clearance.struck
+        ? 'struck directly — this is the aura path'
+        : `clearance ${clearance.distance.toFixed(3)} against a gland half-extent of ${clearance.halfExtent} — no contact`,
+    ]);
+  }
+
+  rows.forEach(([label, value]) => {
+    const row = document.createElement('div');
+    row.className = 'hud-row';
+    const key = document.createElement('span');
+    key.className = 'hud-key';
+    key.textContent = label;
+    const readoutValue = document.createElement('span');
+    readoutValue.className = 'hud-value';
+    readoutValue.textContent = value;
+    if (label === 'PINEAL') row.classList.add(clearance?.struck ? 'hud-row--struck' : 'hud-row--clear');
+    row.append(key, readoutValue);
+    container.appendChild(row);
+  });
 }
 
 // One builder for both chip groups. Roving tabindex keeps a group of controls to a
@@ -263,6 +319,7 @@ function buildSymptomBlock(container, mode, onSingle, onCombination) {
 function initSimulator(scene) {
   const readoutList = document.querySelector('[data-readout]');
   const detail = document.querySelector('[data-sim-detail]');
+  const hud = document.querySelector('[data-sim-hud]');
   const hook = document.querySelector('#sim-heading');
   const triggers = Array.from(document.querySelectorAll('[data-accordion-trigger]'));
   if (!triggers.length) return;
@@ -278,6 +335,7 @@ function initSimulator(scene) {
     empty.textContent = message;
     readoutList.appendChild(empty);
     detail?.replaceChildren();
+    hud?.replaceChildren();
   };
 
   const appendReadout = (id) => {
@@ -290,6 +348,8 @@ function initSimulator(scene) {
     if (id === AURA_SYMPTOM.id) line.classList.add('readout-line--aura');
     line.textContent = readout(id);
     readoutList.appendChild(line);
+    // The measurements follow the force: they describe whichever path just landed.
+    if (hud) buildHud(hud, id);
   };
 
   // Selecting more than one symptom used to empty this panel, so the most engaged action
@@ -463,6 +523,7 @@ function initReference(scene) {
   const calloutLabel = document.querySelector('[data-callout-label]');
   const calloutCaption = document.querySelector('[data-callout-caption]');
   const calloutAngle = document.querySelector('[data-callout-angle]');
+  const hud = document.querySelector('[data-reference-hud]');
   const nucleus = document.querySelector('#reference-callout .nucleus-zoom');
   if (!list) return;
 
@@ -490,6 +551,7 @@ function initReference(scene) {
     if (calloutAngle) {
       calloutAngle.textContent = `${elevation} from axial`;
     }
+    if (hud) buildHud(hud, id);
     if (nucleus) {
       nucleus.style.setProperty('--beam-angle', angle);
     }

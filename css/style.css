@@ -1225,3 +1225,55 @@ h3 {
   border-radius: 50%;
   background: var(--accent);
 }
+
+/* ---------- Measurements ---------- */
+
+/* Cool, mono, and derived: every figure here comes from js/data.js or falls out of the
+   geometry, so it is a fact about the model rather than a claim about migraine. */
+.hud {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 1.4rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid var(--line);
+  font-family: var(--mono);
+  font-size: 0.76rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.5;
+}
+
+.hud:empty {
+  display: none;
+}
+
+.hud-row {
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 1fr);
+  gap: 0.6rem;
+}
+
+.hud-key {
+  color: var(--bio);
+  letter-spacing: 0.08em;
+}
+
+.hud-value {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+/* The author's one non-negotiable, stated as a measurement the reader can watch hold. */
+.hud-row--clear .hud-value {
+  color: var(--bio-dim);
+}
+
+.hud-row--struck .hud-value {
+  color: var(--accent-deep);
+}
+
+@media (max-width: 520px) {
+  .hud-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+}

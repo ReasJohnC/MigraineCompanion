@@ -132,6 +132,45 @@ export const PAGE_COPY = {
   },
 };
 
+// The pineal group in brain.js is a body scaled to (0.052, 0.04, 0.042) plus a cone
+// tapering 0.068 along -x from an offset of 0.036, so its half-extent stays under 0.075.
+const PINEAL_HALF_EXTENT = 0.075;
+
+const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+
+// Perpendicular distance from the pineal to a beam's line. The author's one hard
+// constraint is that no Section-1 line may pass through the gland; this is the number
+// that says whether it holds, computed from the shipped vectors rather than asserted.
+export function pinealClearance(symptomId) {
+  const symptom = getSymptom(symptomId);
+  const structure = symptom && getStructure(symptom.structureId);
+  if (!symptom || !structure) return null;
+  if (structure.id === 'pineal') return { struck: true, distance: 0, halfExtent: PINEAL_HALF_EXTENT };
+
+  const pineal = getStructure('pineal').position;
+  const offset = pineal.map((v, i) => v - structure.position[i]);
+  const dir = symptom.beamDir;
+  const scale = Math.sqrt(dot3(dir, dir));
+  const unit = dir.map((v) => v / scale);
+  const along = dot3(offset, unit);
+  const perpendicular = offset.map((v, i) => v - along * unit[i]);
+
+  return {
+    struck: false,
+    distance: Math.sqrt(dot3(perpendicular, perpendicular)),
+    halfExtent: PINEAL_HALF_EXTENT,
+  };
+}
+
+// Angle between two symptoms' entry vectors, in degrees.
+export function angleBetween(aId, bId) {
+  const a = getSymptom(aId)?.beamDir;
+  const b = getSymptom(bId)?.beamDir;
+  if (!a || !b) return null;
+  const cosine = dot3(a, b) / (Math.sqrt(dot3(a, a)) * Math.sqrt(dot3(b, b)));
+  return (Math.acos(Math.max(-1, Math.min(1, cosine))) * 180) / Math.PI;
+}
+
 export function getStructure(id) {
   return STRUCTURES.find((structure) => structure.id === id);
 }

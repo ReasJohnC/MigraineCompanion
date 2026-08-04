@@ -73,10 +73,12 @@ const STAGE_KEYFRAMES = {
     target: [0.01, -0.12, 0.02],
     fov: 36,
   },
+  // A close orbit on the gland: this is the payoff section, and the shell is transparent
+  // enough now to look through rather than around.
   'pineal-body': {
-    position: [1.15, 0.85, 1.9],
+    position: [0.68, 0.55, 1.15],
     target: [-0.26, 0.04, 0],
-    fov: 34,
+    fov: 28,
   },
   // Looking down the axis that opens the fan widest. Measured over every pair of beams,
   // the tightest apparent separation is 33.0° from here against 0.9° from the old 3/4
@@ -788,6 +790,7 @@ export class BrainScene {
     this.focusPose = null;
     this.zone.visible = Boolean(keyframe.zone);
     this.labelLayer.hidden = !keyframe.labels;
+    if (this.crystals) this.crystals.visible = id === 'pineal-body';
     this.clearActive();
     this.setRigPose(keyframe, immediate);
   }
@@ -880,6 +883,13 @@ export class BrainScene {
     this.camera.updateProjectionMatrix();
     this.camera.lookAt(target);
     this.controls.update();
+  }
+
+  // A very slow turn so the specimen reads as live rather than parked. It stops the
+  // moment the reader takes hold of it and only resumes once they have let go.
+  updateIdleSpin(now) {
+    if (this.reducedMotion || now < this.userControlUntil) return;
+    this.root.rotation.y += 0.02 * this.delta;
   }
 
   updateRig(now) {
@@ -1025,7 +1035,50 @@ export class BrainScene {
     pinealTaper.rotation.z = Math.PI / 2;
     pinealTaper.renderOrder = 6;
     pineal.add(pinealTaper);
+
+    // The author's copy describes the microcrystals as "hexagon shape with sharp edges",
+    // so they are drawn as hexagonal prisms. This is the most speculative claim on the
+    // page: they appear only in the Pineal section, alongside the paragraph that opens
+    // "In this theory", and never as part of the general anatomy.
+    this.crystals = new THREE.Group();
+    this.crystals.visible = false;
+    const crystalGeometry = new THREE.CylinderGeometry(0.009, 0.009, 0.03, 6, 1);
+    const crystalMaterial = new THREE.MeshStandardMaterial({
+      color: 0xdfeef2,
+      roughness: 0.12,
+      metalness: 0.1,
+      transparent: true,
+      opacity: 0.9,
+      emissive: 0x0d3a3a,
+      emissiveIntensity: 0.6,
+      depthWrite: false,
+      flatShading: true,
+    });
+    for (let i = 0; i < 11; i += 1) {
+      const crystal = new THREE.Mesh(crystalGeometry, crystalMaterial);
+      const angle = (i / 11) * Math.PI * 2;
+      const radius = 0.016 + (i % 3) * 0.011;
+      crystal.position.set(
+        Math.cos(angle) * radius,
+        Math.sin(angle * 1.7) * 0.014,
+        Math.sin(angle) * radius * 0.8,
+      );
+      crystal.rotation.set(angle * 1.3, angle, angle * 0.7);
+      crystal.renderOrder = 7;
+      this.crystals.add(crystal);
+    }
+    pineal.add(this.crystals);
+    this.crystalMaterial = crystalMaterial;
     this.root.add(pineal);
+  }
+
+  // The crystals turn slowly and catch the light, which is what the copy describes them
+  // doing when the force arrives.
+  updateCrystals(now) {
+    if (!this.crystals?.visible) return;
+    if (!this.reducedMotion) this.crystals.rotation.y = now / 5200;
+    const glint = 0.5 + 0.5 * Math.sin(now / 900);
+    this.crystalMaterial.emissiveIntensity = 0.4 + glint * (this.markers.get('pineal')?.active ? 1.5 : 0.35);
   }
 
   createInteractiveMarkers() {
@@ -1252,6 +1305,12 @@ export class BrainScene {
     this.reducedMotion = Boolean(value);
     if (this.controls) {
       this.controls.enableDamping = !this.reducedMotion;
+    }
+    // Reduced motion is a complete path, not a degraded one: the camera still visits
+    // every keyframe, it just arrives rather than travels, and the specimen holds still.
+    if (this.reducedMotion) {
+      this.root.rotation.y = 0;
+      this.snapToRig();
     }
   }
 
@@ -1552,6 +1611,8 @@ export class BrainScene {
 
     this.tickBeams(now);
     this.updateMarkers(now);
+    this.updateCrystals(now);
+    this.updateIdleSpin(now);
     this.updateRig(now);
     this.controls?.update();
     this.updateLabels();
