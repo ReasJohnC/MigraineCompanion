@@ -19,6 +19,11 @@
     </script>
   </head>
   <body>
+    <div class="brain-canvas" id="brain-canvas" aria-hidden="true">
+      <p class="brain-loading">Loading brain model…</p>
+    </div>
+    <div class="stage-hit" id="stage-hit" aria-hidden="true"></div>
+
     <a class="skip-link" href="#main">Skip to main content</a>
 
     <p class="visually-hidden" id="stage-keys">
@@ -82,15 +87,13 @@
           </div>
           <div class="model-column">
             <div
-              class="brain-stage brain-stage--overview"
+              class="stage-window"
               data-brain="overview"
               role="application"
               tabindex="0"
               aria-describedby="stage-keys"
               aria-label="Rotatable 3D anatomical brain model highlighting the thalamus, hypothalamus, and pineal region with no force beam."
-            >
-              <div class="brain-loading">Loading brain model...</div>
-            </div>
+            ></div>
           </div>
         </div>
       </section>
@@ -147,15 +150,13 @@
           <div class="interactive-layout">
             <div class="module-column">
               <div
-                class="brain-stage brain-stage--simulator"
+                class="stage-window"
                 data-brain="simulator"
                 role="application"
                 tabindex="0"
                 aria-describedby="stage-keys"
                 aria-label="Rotatable 3D anatomical brain model. A fixed line runs through the selected structure while a cursor travels along it."
-              >
-                <div class="brain-loading">Loading brain model...</div>
-              </div>
+              ></div>
             </div>
 
             <aside class="detail-panel" aria-labelledby="sim-heading">
@@ -187,15 +188,13 @@
           <div class="interactive-layout">
             <div class="module-column">
               <div
-                class="brain-stage brain-stage--structures"
+                class="stage-window"
                 data-brain="structures"
                 role="application"
                 tabindex="0"
                 aria-describedby="stage-keys"
                 aria-label="Rotatable 3D anatomical brain model showing the selected structure and the angle of force that reaches it."
-              >
-                <div class="brain-loading">Loading brain model...</div>
-              </div>
+              ></div>
             </div>
 
             <aside class="detail-panel reference-panel">
@@ -218,15 +217,25 @@
         </div>
       </section>
 
-      <section class="section alt-section" id="pineal-body" aria-labelledby="pineal-title">
-        <div class="section-inner">
-          <div class="narrow-layout">
+      <section class="section model-section alt-section" id="pineal-body" aria-labelledby="pineal-title">
+        <div class="section-inner split-layout">
+          <div class="copy-column">
             <p class="section-number">04</p>
             <h2 id="pineal-title" data-copy="pineal-title"></h2>
             <ul class="key-points" data-pineal-points></ul>
             <p data-copy="pineal-blurb"></p>
             <p data-copy="pineal-theory"></p>
             <p class="caption" data-copy="pineal-caption"></p>
+          </div>
+          <div class="model-column">
+            <div
+              class="stage-window"
+              data-brain="pineal"
+              role="application"
+              tabindex="0"
+              aria-describedby="stage-keys"
+              aria-label="Rotatable 3D anatomical brain model in close view on the pineal body, with the force arriving from its own upper-posterior angle."
+            ></div>
           </div>
         </div>
       </section>
@@ -247,15 +256,13 @@
           </div>
           <div class="model-column">
             <div
-              class="brain-stage brain-stage--angles"
+              class="stage-window"
               data-brain="angles"
               role="application"
               tabindex="0"
               aria-describedby="stage-keys"
               aria-label="Rotatable 3D anatomical brain model showing the distinct force angles as a sequence or fan."
-            >
-              <div class="brain-loading">Loading brain model...</div>
-            </div>
+            ></div>
           </div>
         </div>
       </section>

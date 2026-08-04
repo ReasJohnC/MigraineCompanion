@@ -423,6 +423,18 @@ function initSimulator(scene) {
 
   setOpen(null);
 
+  // The scene is shared, so scrolling back to this section restates its selection
+  // rather than leaving the previous section's beams on screen.
+  const reapply = () => {
+    if (!openMode) {
+      scene?.clearActive();
+      return;
+    }
+    const ids = currentSelection(openMode);
+    if (ids.length) fire(ids, { instant: true });
+    else scene?.clearActive();
+  };
+
   const stored = safeRead();
   if (stored?.mode && blocks.has(stored.mode) && Array.isArray(stored.ids) && stored.ids.length) {
     const valid = stored.ids.filter((id) => SYMPTOMS.some((symptom) => symptom.id === id));
@@ -440,6 +452,8 @@ function initSimulator(scene) {
       fire(valid, { instant: true });
     }
   }
+
+  return reapply;
 }
 
 function initReference(scene) {
@@ -491,6 +505,11 @@ function initReference(scene) {
   );
 
   select(BEAM_DEFS[0].id, { instant: true });
+
+  return () => {
+    const current = group.buttons.find((b) => b.getAttribute('aria-checked') === 'true');
+    select(current?.dataset.symptomId ?? BEAM_DEFS[0].id, { instant: true });
+  };
 }
 
 const SEQUENCE_COMPLETE =
@@ -504,6 +523,7 @@ function initAnglesModule(anglesScene, motionQuery) {
 
   let playing = false;
   let step = 0;
+  let shown = null;
 
   const setStatus = (text) => {
     if (status) status.textContent = text;
@@ -521,6 +541,7 @@ function initAnglesModule(anglesScene, motionQuery) {
 
   const stepOnce = () => {
     const id = BEAM_SEQUENCE[step];
+    shown = { kind: 'single', id };
     anglesScene.showSingleAngle(id);
     setStatus(readout(id));
     step += 1;
@@ -556,6 +577,7 @@ function initAnglesModule(anglesScene, motionQuery) {
   showAllButton?.addEventListener('click', () => {
     if (playing) anglesScene.cancelSequence();
     step = 0;
+    shown = { kind: 'all' };
     anglesScene.showAllBeams();
     setStatus('Five angles, four targets: every path the force can take.');
   });
@@ -567,6 +589,14 @@ function initAnglesModule(anglesScene, motionQuery) {
       resetLabel();
     });
   }
+
+  // Scrolling away hands the model to another section; coming back restores whatever
+  // this one was last showing rather than silently emptying it.
+  return () => {
+    if (playing) return;
+    if (shown?.kind === 'all') anglesScene.showAllBeams();
+    else if (shown?.kind === 'single') anglesScene.showSingleAngle(shown.id);
+  };
 }
 
 function initReducedMotionListener(scenes, motionQuery) {
@@ -586,8 +616,20 @@ function initReducedMotionListener(scenes, motionQuery) {
 export function initUI({ scenes, motionQuery }) {
   initCopy();
   initNavigation();
-  initSimulator(scenes.simulator);
-  initReference(scenes.structures);
-  initAnglesModule(scenes.angles, motionQuery);
-  initReducedMotionListener(Object.values(scenes), motionQuery);
+  const restateSimulator = initSimulator(scenes.simulator);
+  const restateStructures = initReference(scenes.structures);
+  const restateAngles = initAnglesModule(scenes.angles, motionQuery);
+  initReducedMotionListener([scenes.overview], motionQuery);
+
+  // One scene serves every section, so the section the reader has scrolled to restates
+  // itself as the model is handed over.
+  const stageHandlers = {
+    simulator: restateSimulator,
+    structures: restateStructures,
+    'angles-of-force': restateAngles,
+  };
+
+  return {
+    onStageChange: (id) => stageHandlers[id]?.(),
+  };
 }

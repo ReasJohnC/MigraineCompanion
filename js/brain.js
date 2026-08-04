@@ -10,7 +10,6 @@ import {
 
 const ACCENT = 0xff7a45;
 const Y_AXIS = new THREE.Vector3(0, 1, 0);
-const CAMERA_ZOOM = 1.16;
 const CORTEX_BASE_COLOR = new THREE.Color(0xc79b93);
 const CORTEX_GYRUS_COLOR = new THREE.Color(0xe2b9ad);
 const CORTEX_SULCUS_COLOR = new THREE.Color(0x85605f);
@@ -24,23 +23,9 @@ const CORE_MARKERS = [
   { label: 'Pineal', position: [-0.28, 0.05, 0] },
 ];
 
+// Where the camera goes when a single structure is selected, overriding the section's
+// own keyframe until the selection clears.
 const CAMERA_PRESETS = {
-  overview: {
-    position: [1.7, 0.9, 2.08],
-    target: [-0.08, -0.07, 0],
-  },
-  structures: {
-    position: [1.55, 0.75, 1.88],
-    target: [0.01, -0.12, 0.02],
-  },
-  simulator: {
-    position: [1.55, 0.75, 1.88],
-    target: [0.01, -0.12, 0.02],
-  },
-  angles: {
-    position: [1.72, 0.95, 2.18],
-    target: [-0.02, -0.08, 0],
-  },
   'lateral-tuberal': {
     position: [1.22, 0.5, 1.42],
     target: [0.06, -0.18, 0.04],
@@ -58,6 +43,75 @@ const CAMERA_PRESETS = {
     target: [-0.26, 0.04, 0],
   },
 };
+
+// One keyframe per section, in document order. The camera is never cut between them: it
+// runs a spline through this list as the reader scrolls, so the whole page is one move
+// through one specimen.
+const STAGE_KEYFRAMES = {
+  hero: {
+    position: [2.06, 0.78, 2.64],
+    target: [0, 0, 0],
+    fov: 34,
+  },
+  'prodrome-zone': {
+    position: [1.97, 1.04, 2.41],
+    target: [-0.08, -0.07, 0],
+    fov: 38,
+    zone: true,
+    labels: true,
+  },
+  simulator: {
+    position: [1.8, 0.87, 2.18],
+    target: [0.01, -0.12, 0.02],
+    fov: 36,
+  },
+  structures: {
+    position: [1.72, 0.8, 2.05],
+    target: [0.01, -0.12, 0.02],
+    fov: 36,
+  },
+  'pineal-body': {
+    position: [1.15, 0.85, 1.9],
+    target: [-0.26, 0.04, 0],
+    fov: 34,
+  },
+  // Looking down the axis that opens the fan widest. Measured over every pair of beams,
+  // the tightest apparent separation is 33.0° from here against 0.9° from the old 3/4
+  // view, where four of the five lines collapsed into one bundle. This changes the
+  // viewpoint, never the vectors — see plan §C3.4.
+  'angles-of-force': {
+    position: [1.24, 2.18, 0.78],
+    target: [-0.02, -0.08, 0],
+    fov: 40,
+  },
+};
+
+export const STAGE_ORDER = [
+  'hero',
+  'prodrome-zone',
+  'simulator',
+  'structures',
+  'pineal-body',
+  'angles-of-force',
+];
+
+const STAGE_POSITION_CURVE = new THREE.CatmullRomCurve3(
+  STAGE_ORDER.map((id) => new THREE.Vector3(...STAGE_KEYFRAMES[id].position)),
+);
+const STAGE_TARGET_CURVE = new THREE.CatmullRomCurve3(
+  STAGE_ORDER.map((id) => new THREE.Vector3(...STAGE_KEYFRAMES[id].target)),
+);
+
+function lerpKeyframeFov(u) {
+  const lower = Math.max(0, Math.min(STAGE_ORDER.length - 1, Math.floor(u)));
+  const upper = Math.min(STAGE_ORDER.length - 1, lower + 1);
+  const a = STAGE_KEYFRAMES[STAGE_ORDER[lower]].fov ?? 38;
+  const b = STAGE_KEYFRAMES[STAGE_ORDER[upper]].fov ?? 38;
+  return a + (b - a) * clamp(u - lower, 0, 1);
+}
+
+// How long the rig stays out of the way after the reader stops turning the model.
+const USER_CONTROL_HOLD = 2600;
 
 // An ellipsoid fitted inside the displaced cerebrum's measured bounds (x -1.13..1.19,
 // y -0.59..0.84, z -0.64..0.68), so any point on it is under the cortical surface rather
@@ -411,10 +465,13 @@ function disposeObject(object) {
 export class BrainScene {
   constructor(container, options = {}) {
     this.container = container;
-    this.mode = options.mode ?? 'structures';
+    this.stage = 'hero';
     this.reducedMotion = Boolean(options.reducedMotion);
     this.activeIds = [];
-    this.cameraFrame = null;
+    this.frameRect = null;
+    this.rigPose = null;
+    this.focusPose = null;
+    this.delta = 0.016;
     this.sequenceToken = 0;
     this.markers = new Map();
     this.beams = new Map();
@@ -450,51 +507,55 @@ export class BrainScene {
     this.createBrain();
     this.createCoreStructures();
     this.createInteractiveMarkers();
-    if (this.mode !== 'overview') {
-      this.createBeams();
-    }
+    this.createBeams();
     this.createOverviewLabels();
 
-    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+    // Pointer events arrive on a separate element tracking the active stage window: the
+    // canvas itself is behind the whole document and must not swallow scrolls or clicks.
+    this.controls = new OrbitControls(this.camera, options.hitArea ?? this.renderer.domElement);
     this.controls.enableDamping = !this.reducedMotion;
     this.controls.dampingFactor = 0.065;
     this.controls.enablePan = false;
-    this.controls.minDistance = 1.45;
-    this.controls.maxDistance = 4.2;
-    this.controls.maxPolarAngle = Math.PI * 0.78;
-    this.controls.minPolarAngle = Math.PI * 0.15;
+    // Framing pushes the camera back so the model reads at its window's size rather than
+    // the viewport's, so the usable range is much wider than it was inside a stage box.
+    this.controls.minDistance = 0.9;
+    this.controls.maxDistance = 14;
+    this.controls.maxPolarAngle = Math.PI * 0.86;
+    this.controls.minPolarAngle = Math.PI * 0.1;
+
+    // While the reader is turning the model themselves the rig stops writing the camera,
+    // and eases back only once they have let go and settled.
+    this.userControlUntil = 0;
+    this.controls.addEventListener('start', () => {
+      this.userControlUntil = Infinity;
+    });
+    this.controls.addEventListener('end', () => {
+      this.userControlUntil = performance.now() + USER_CONTROL_HOLD;
+    });
 
     this.handleKey = this.handleKey.bind(this);
-    this.container.addEventListener('keydown', this.handleKey);
+    this.render = this.render.bind(this);
+    this.updateRunState = this.updateRunState.bind(this);
 
-    this.applyModeDefaults(true);
+    // Every stage window drives the same camera; whichever one has focus can turn it.
+    this.keyTargets = Array.from(document.querySelectorAll('[data-brain]'));
+    this.keyTargets.forEach((element) => element.addEventListener('keydown', this.handleKey));
+
+    this.setStage('hero', { immediate: true });
     this.resize();
 
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(this.container);
 
-    this.render = this.render.bind(this);
-    this.updateRunState = this.updateRunState.bind(this);
-
-    this.isVisible = true;
     this.running = false;
-    this.viewportObserver = new IntersectionObserver(
-      (entries) => {
-        this.isVisible = entries.some((entry) => entry.isIntersecting);
-        this.updateRunState();
-      },
-      { threshold: 0.01 },
-    );
-    this.viewportObserver.observe(this.container);
     document.addEventListener('visibilitychange', this.updateRunState);
     this.updateRunState();
   }
 
   updateRunState() {
-    // A cursor already in flight keeps the loop alive even if the reader
-    // scrolls away, so its label still resolves instead of freezing.
-    const busy = this.beamAnimations.size > 0;
-    const shouldRun = (this.isVisible || busy) && document.visibilityState !== 'hidden';
+    // The one canvas is on screen for the whole document, so only tab visibility can
+    // pause it.
+    const shouldRun = document.visibilityState !== 'hidden';
     if (shouldRun && !this.running) {
       this.running = true;
       this.frame = requestAnimationFrame(this.render);
@@ -505,6 +566,124 @@ export class BrainScene {
         this.frame = null;
       }
     }
+  }
+
+  // --- camera rig ----------------------------------------------------------
+  // The rig holds the pose the camera is heading for. Scroll moves it along a spline
+  // through the stage keyframes; a selection can pull it to a structure; the render loop
+  // eases the real camera toward it. Nothing jump-cuts.
+
+  // Handing the model to a different section: it drops whatever the previous section had
+  // lit, and that section's own handler re-applies its state.
+  setStage(id, { immediate = false } = {}) {
+    const keyframe = STAGE_KEYFRAMES[id] ?? STAGE_KEYFRAMES.hero;
+    this.stage = id;
+    this.focusPose = null;
+    this.zone.visible = Boolean(keyframe.zone);
+    this.labelLayer.hidden = !keyframe.labels;
+    this.clearActive();
+    this.setRigPose(keyframe, immediate);
+  }
+
+  setRigPose(pose, immediate = false) {
+    this.rigPose = {
+      position: vectorFromArray(pose.position),
+      target: vectorFromArray(pose.target),
+      fov: pose.fov ?? 38,
+    };
+    if (immediate || this.reducedMotion) this.snapToRig();
+  }
+
+  // Scroll position between two stages, as a float index into STAGE_ORDER. The camera
+  // follows a Catmull-Rom spline through the keyframes rather than crossfading views.
+  setScrollProgress(u) {
+    if (this.focusPose) return;
+    const span = STAGE_ORDER.length - 1;
+    const t = clamp(u / span, 0, 1);
+    this.rigPose = {
+      position: STAGE_POSITION_CURVE.getPoint(t),
+      target: STAGE_TARGET_CURVE.getPoint(t),
+      fov: lerpKeyframeFov(u),
+    };
+    if (this.reducedMotion) this.snapToRig();
+  }
+
+  // A selection pulls the camera to its structure and holds it there until cleared.
+  setFocus(structureId) {
+    const preset = CAMERA_PRESETS[structureId];
+    if (!preset) return;
+    this.focusPose = true;
+    this.setRigPose({ ...preset, fov: 32 });
+  }
+
+  // Holds a section's own keyframe against further scrolling. The capstone needs this:
+  // its framing is what makes five angles read as five lines, and it must not depend on
+  // the reader happening to have that section exactly centred.
+  focusStage(id) {
+    const keyframe = STAGE_KEYFRAMES[id];
+    if (!keyframe) return;
+    this.focusPose = true;
+    this.setRigPose(keyframe);
+  }
+
+  // Releases the camera back to the section's framing without disturbing what is lit.
+  clearFocus() {
+    this.focusPose = null;
+    this.setRigPose(STAGE_KEYFRAMES[this.stage] ?? STAGE_KEYFRAMES.hero);
+  }
+
+  // The viewport rect the model should appear inside, in CSS pixels. The camera is
+  // offset so the model lands in that rect rather than in the middle of the screen.
+  setFrameRect(rect) {
+    this.frameRect = rect;
+  }
+
+  framedPose(position, target) {
+    const rect = this.frameRect;
+    if (!rect || !rect.height) return { position, target };
+
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    // Push back so the model reads at the window's size, not the viewport's.
+    const fit = clamp(height / rect.height, 1, 2.6);
+    const framedPosition = target.clone().add(position.clone().sub(target).multiplyScalar(fit));
+
+    const distance = framedPosition.distanceTo(target);
+    const worldHeight = 2 * distance * Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2);
+    const worldWidth = worldHeight * this.camera.aspect;
+    const ndcX = ((rect.left + rect.width / 2) / width) * 2 - 1;
+    const ndcY = -((((rect.top + rect.height / 2) / height) * 2) - 1);
+
+    const forward = target.clone().sub(framedPosition).normalize();
+    const right = forward.clone().cross(this.camera.up).normalize();
+    const up = right.clone().cross(forward).normalize();
+    const shift = right
+      .multiplyScalar((-ndcX * worldWidth) / 2)
+      .add(up.multiplyScalar((-ndcY * worldHeight) / 2));
+
+    return { position: framedPosition.add(shift), target: target.clone().add(shift) };
+  }
+
+  snapToRig() {
+    if (!this.rigPose) return;
+    this.camera.fov = this.rigPose.fov;
+    const { position, target } = this.framedPose(this.rigPose.position, this.rigPose.target);
+    this.camera.position.copy(position);
+    this.controls.target.copy(target);
+    this.camera.updateProjectionMatrix();
+    this.camera.lookAt(target);
+    this.controls.update();
+  }
+
+  updateRig(now) {
+    if (!this.rigPose || now < this.userControlUntil) return;
+    const { position, target } = this.framedPose(this.rigPose.position, this.rigPose.target);
+    // Frame-rate independent easing toward the rig pose.
+    const ease = 1 - Math.pow(0.0016, this.delta);
+    this.camera.position.lerp(position, ease);
+    this.controls.target.lerp(target, ease);
+    this.camera.fov += (this.rigPose.fov - this.camera.fov) * ease;
+    this.camera.updateProjectionMatrix();
   }
 
   createLights() {
@@ -824,14 +1003,6 @@ export class BrainScene {
     });
   }
 
-  applyModeDefaults(immediate = false) {
-    const preset = CAMERA_PRESETS[this.mode] ?? CAMERA_PRESETS.structures;
-    this.zone.visible = this.mode === 'overview';
-    this.labelLayer.hidden = this.mode !== 'overview';
-    this.clearActive();
-    this.moveCameraTo(preset, immediate || this.reducedMotion ? 0 : 650);
-  }
-
   // Keyboard orbit: the stage is a control surface, and a pointer was the only way to
   // turn the model. Arrows rotate, +/- zoom, 0 returns to the section's framing.
   handleKey(event) {
@@ -865,16 +1036,14 @@ export class BrainScene {
         break;
       case '0':
         event.preventDefault();
-        this.moveCameraTo(
-          CAMERA_PRESETS[this.mode] ?? CAMERA_PRESETS.structures,
-          this.reducedMotion ? 0 : 420,
-        );
+        this.userControlUntil = 0;
         return;
       default:
         return;
     }
 
     event.preventDefault();
+    this.userControlUntil = performance.now() + USER_CONTROL_HOLD;
     spherical.phi = clamp(spherical.phi, this.controls.minPolarAngle, this.controls.maxPolarAngle);
     spherical.radius = clamp(
       spherical.radius,
@@ -899,6 +1068,10 @@ export class BrainScene {
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height, false);
+    // A full-viewport canvas costs four times the pixels at DPR 2; cap it on the small
+    // screens least able to pay for them.
+    const cap = width < 760 ? 1.5 : 2;
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, cap));
   }
 
   setMarkerVisible(id, visible) {
@@ -989,10 +1162,6 @@ export class BrainScene {
   }
 
   stopAnimations() {
-    if (this.cameraFrame) {
-      cancelAnimationFrame(this.cameraFrame);
-      this.cameraFrame = null;
-    }
     this.beamAnimations.forEach((animation) => animation.resolve?.());
     this.beamAnimations.clear();
   }
@@ -1043,8 +1212,6 @@ export class BrainScene {
   }
 
   revealSymptoms(ids, options = {}) {
-    if (this.mode === 'overview') return Promise.resolve();
-
     const list = (Array.isArray(ids) ? ids : [ids]).filter((id) => this.beams.has(id));
     if (!list.length) {
       this.clearActive();
@@ -1063,9 +1230,8 @@ export class BrainScene {
     });
 
     const single = list.length === 1 ? getSymptom(list[0]) : null;
-    const preset =
-      (single && CAMERA_PRESETS[single.structureId]) ?? CAMERA_PRESETS[this.mode] ?? CAMERA_PRESETS.structures;
-    this.moveCameraTo(preset, this.reducedMotion || options.instant ? 0 : 760);
+    if (single) this.setFocus(single.structureId);
+    else this.clearFocus();
 
     if (this.reducedMotion || options.instant) {
       list.forEach((id) => {
@@ -1083,48 +1249,6 @@ export class BrainScene {
     );
   }
 
-  moveCameraTo(preset, duration = 0) {
-    const targetLookAt = vectorFromArray(preset.target);
-    const targetPosition = vectorFromArray(preset.position)
-      .sub(targetLookAt)
-      .multiplyScalar(CAMERA_ZOOM)
-      .add(targetLookAt);
-
-    if (!duration) {
-      this.camera.position.copy(targetPosition);
-      this.controls?.target.copy(targetLookAt);
-      this.camera.lookAt(targetLookAt);
-      this.controls?.update();
-      return;
-    }
-
-    if (this.cameraFrame) {
-      cancelAnimationFrame(this.cameraFrame);
-      this.cameraFrame = null;
-    }
-
-    const startPosition = this.camera.position.clone();
-    const startTarget = this.controls.target.clone();
-    const startedAt = performance.now();
-
-    const step = (now) => {
-      const elapsed = now - startedAt;
-      const progress = easeInOutCubic(clamp(elapsed / duration));
-      this.camera.position.lerpVectors(startPosition, targetPosition, progress);
-      this.controls.target.lerpVectors(startTarget, targetLookAt, progress);
-      this.camera.lookAt(this.controls.target);
-      this.controls.update();
-
-      if (progress < 1) {
-        this.cameraFrame = requestAnimationFrame(step);
-      } else {
-        this.cameraFrame = null;
-      }
-    };
-
-    this.cameraFrame = requestAnimationFrame(step);
-  }
-
   // Reveals one angle on its own, with no travel. The reduced-motion capstone steps
   // through the sequence with this so "Play" and "Show all" stay different actions.
   showSingleAngle(id) {
@@ -1139,9 +1263,7 @@ export class BrainScene {
     if (symptom) this.setMarkerVisible(symptom.structureId, true);
     this.setBeamResolved(id);
 
-    const preset =
-      (symptom && CAMERA_PRESETS[symptom.structureId]) ?? CAMERA_PRESETS[this.mode];
-    this.moveCameraTo(preset, this.reducedMotion ? 0 : 520);
+    if (symptom) this.setFocus(symptom.structureId);
   }
 
   // Invalidates the running sequence's token, so its loop stops at the next step.
@@ -1174,7 +1296,7 @@ export class BrainScene {
     this.activeIds = [...BEAM_SEQUENCE];
     this.hideMarkers();
     this.hideBeams();
-    this.moveCameraTo(CAMERA_PRESETS.angles, this.reducedMotion ? 0 : 520);
+    this.focusStage('angles-of-force');
 
     BEAM_SEQUENCE.forEach((id) => {
       const symptom = getSymptom(id);
@@ -1204,7 +1326,12 @@ export class BrainScene {
 
   render() {
     if (!this.running) return;
-    this.tickBeams(performance.now());
+    const now = performance.now();
+    this.delta = Math.min(0.05, (now - (this.lastFrame ?? now - 16)) / 1000);
+    this.lastFrame = now;
+
+    this.tickBeams(now);
+    this.updateRig(now);
     this.controls?.update();
     this.updateLabels();
     this.renderer.render(this.scene, this.camera);
@@ -1215,8 +1342,7 @@ export class BrainScene {
     this.running = false;
     this.stopAnimations();
     cancelAnimationFrame(this.frame);
-    this.viewportObserver?.disconnect();
-    this.container.removeEventListener('keydown', this.handleKey);
+    this.keyTargets?.forEach((el) => el.removeEventListener('keydown', this.handleKey));
     document.removeEventListener('visibilitychange', this.updateRunState);
     this.resizeObserver?.disconnect();
     this.controls?.dispose();
