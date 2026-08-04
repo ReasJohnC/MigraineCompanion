@@ -79,6 +79,7 @@ const STAGE_KEYFRAMES = {
     position: [0.68, 0.55, 1.15],
     target: [-0.26, 0.04, 0],
     fov: 28,
+    fill: 0.4,
   },
   // Looking down the axis that opens the fan widest. Measured over every pair of beams,
   // the tightest apparent separation is 33.0° from here against 0.9° from the old 3/4
@@ -112,6 +113,20 @@ function lerpKeyframeFov(u) {
   const upper = Math.min(STAGE_ORDER.length - 1, lower + 1);
   const a = STAGE_KEYFRAMES[STAGE_ORDER[lower]].fov ?? 38;
   const b = STAGE_KEYFRAMES[STAGE_ORDER[upper]].fov ?? 38;
+  return a + (b - a) * clamp(u - lower, 0, 1);
+}
+
+// The specimen's measured extent (bbox x -1.13..1.19, y -0.59..0.84), and how much of the
+// window it is allowed to fill. Above 1 it bleeds past the window's edges, which reads as
+// intentional; the pineal close-up deliberately goes much closer.
+const MODEL_EXTENT = { x: 2.35, y: 1.45 };
+const DEFAULT_FILL = 0.86;
+
+function lerpKeyframeFill(u) {
+  const lower = Math.max(0, Math.min(STAGE_ORDER.length - 1, Math.floor(u)));
+  const upper = Math.min(STAGE_ORDER.length - 1, lower + 1);
+  const a = STAGE_KEYFRAMES[STAGE_ORDER[lower]].fill ?? DEFAULT_FILL;
+  const b = STAGE_KEYFRAMES[STAGE_ORDER[upper]].fill ?? DEFAULT_FILL;
   return a + (b - a) * clamp(u - lower, 0, 1);
 }
 
@@ -800,6 +815,7 @@ export class BrainScene {
       position: vectorFromArray(pose.position),
       target: vectorFromArray(pose.target),
       fov: pose.fov ?? 38,
+      fill: pose.fill ?? DEFAULT_FILL,
     };
     if (immediate || this.reducedMotion) this.snapToRig();
   }
@@ -814,6 +830,7 @@ export class BrainScene {
       position: STAGE_POSITION_CURVE.getPoint(t),
       target: STAGE_TARGET_CURVE.getPoint(t),
       fov: lerpKeyframeFov(u),
+      fill: lerpKeyframeFill(u),
     };
     if (this.reducedMotion) this.snapToRig();
   }
@@ -850,15 +867,27 @@ export class BrainScene {
 
   framedPose(position, target) {
     const rect = this.frameRect;
-    if (!rect || !rect.height) return { position, target };
+    if (!rect || !rect.width || !rect.height) return { position, target };
 
     const width = window.innerWidth;
     const height = window.innerHeight;
-    // Push back so the model reads at the window's size, not the viewport's.
-    const fit = clamp(height / rect.height, 1, 2.6);
-    const framedPosition = target.clone().add(position.clone().sub(target).multiplyScalar(fit));
+    const tanHalfFov = Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2);
 
-    const distance = framedPosition.distanceTo(target);
+    // Distance at which the specimen's measured extent fits the window, derived rather
+    // than guessed: scaling by viewport height alone ignored the horizontal, so on a
+    // portrait phone the model was cropped by a third. The keyframe chooses the angle;
+    // this chooses how far back to stand, at any viewport shape.
+    const required =
+      (height / (2 * tanHalfFov)) *
+      Math.max(MODEL_EXTENT.y / rect.height, MODEL_EXTENT.x / rect.width);
+    const distance = Math.max(
+      position.distanceTo(target),
+      required * (this.rigPose?.fill ?? DEFAULT_FILL),
+    );
+    const framedPosition = target
+      .clone()
+      .add(position.clone().sub(target).normalize().multiplyScalar(distance));
+
     const worldHeight = 2 * distance * Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2);
     const worldWidth = worldHeight * this.camera.aspect;
     const ndcX = ((rect.left + rect.width / 2) / width) * 2 - 1;

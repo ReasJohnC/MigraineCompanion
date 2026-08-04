@@ -220,6 +220,38 @@ function initCopy() {
   }
 }
 
+// Copy arrives as the section does, in reading order, over a short distance. Motion here
+// is the instrument acknowledging you, not decoration — and under reduced motion the
+// reveal is opacity only.
+function initReveals(motionQuery) {
+  const groups = document.querySelectorAll('.copy-column, .hero-copy, .section-heading, .narrow-layout, .footer-grid');
+  const items = [];
+  groups.forEach((group) => {
+    Array.from(group.children).forEach((child, index) => {
+      child.classList.add('reveal');
+      child.style.setProperty('--reveal-delay', `${Math.min(index, 5) * 70}ms`);
+      items.push(child);
+    });
+  });
+
+  if (!('IntersectionObserver' in window)) {
+    items.forEach((item) => item.classList.add('is-revealed'));
+    return;
+  }
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add('is-revealed');
+        observer.unobserve(entry.target);
+      });
+    },
+    { rootMargin: '0px 0px -12% 0px', threshold: 0.01 },
+  );
+  items.forEach((item) => observer.observe(item));
+}
+
 function initNavigation() {
   const nav = document.querySelector('.site-nav');
   const toggle = document.querySelector('.nav-toggle');
@@ -678,6 +710,7 @@ function initReducedMotionListener(scenes, motionQuery) {
 export function initUI({ scenes, motionQuery }) {
   initCopy();
   initNavigation();
+  initReveals(motionQuery);
   const restateSimulator = initSimulator(scenes.simulator);
   const restateStructures = initReference(scenes.structures);
   const restateAngles = initAnglesModule(scenes.angles, motionQuery);

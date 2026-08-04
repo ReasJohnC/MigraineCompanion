@@ -89,7 +89,12 @@
   height: 100%;
 }
 
-body > *:not(.brain-canvas) {
+/* Only the document layers need lifting above the canvas. A blanket `body > *` rule
+   outranks `position: fixed` on the utilities that are also body children — it silently
+   made the skip link take up space and dropped the orbit hit area into the flow, which
+   stopped the model responding to drag at all. */
+main,
+.site-footer {
   position: relative;
   z-index: 1;
 }
@@ -162,8 +167,8 @@ a {
   left: 18px;
   top: 14px;
   z-index: 100;
-  transform: translateY(-140%);
-  border: 1px solid var(--line-strong);
+  transform: translateY(-200%);
+  border: 1px solid var(--line-control);
   border-radius: 6px;
   background: var(--surface);
   padding: 0.6rem 0.85rem;
@@ -171,6 +176,8 @@ a {
 
 .skip-link:focus {
   transform: translateY(0);
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .visually-hidden {
@@ -339,12 +346,12 @@ h3 {
 }
 
 /* The specimen is behind the copy now, not beside it. A soft well of the page base keeps
-   text legible wherever the model drifts, without boxing the copy in. */
+   text legible wherever the model drifts, without boxing the copy in. Only prose that sits
+   directly on the model needs it: the panels carry their own blurred surface, and a scrim
+   on the full-width .section-heading showed as a hard seam across the specimen. */
 .copy-column,
 .hero-copy,
-.detail-panel,
 .narrow-layout,
-.section-heading,
 .footer-grid {
   position: relative;
   isolation: isolate;
@@ -352,9 +359,7 @@ h3 {
 
 .copy-column::before,
 .hero-copy::before,
-.detail-panel::before,
 .narrow-layout::before,
-.section-heading::before,
 .footer-grid::before {
   content: "";
   position: absolute;
@@ -807,7 +812,7 @@ h3 {
   }
 
   .nav-toggle {
-    display: inline-flex;
+  display: inline-flex;
   }
 
   .nav-links {
@@ -815,7 +820,7 @@ h3 {
     left: 0;
     right: 0;
     top: calc(100% + 1px);
-    display: none;
+  display: none;
     flex-direction: column;
     align-items: stretch;
     gap: 0;
@@ -827,11 +832,11 @@ h3 {
   }
 
   .site-nav.is-open .nav-links {
-    display: flex;
+  display: flex;
   }
 
   .nav-links a {
-    padding: 0.85rem;
+  padding: 0.85rem;
   }
 
   .section-inner {
@@ -840,15 +845,15 @@ h3 {
 
   .hero,
   .model-section {
-    padding: 3.4rem 0;
+  padding: 3.4rem 0;
   }
 
   h1 {
-    font-size: clamp(2.6rem, 14vw, 4.1rem);
+  font-size: clamp(2.6rem, 14vw, 4.1rem);
   }
 
   .chip-list {
-    display: grid;
+  display: grid;
     grid-template-columns: 1fr;
   }
 
@@ -866,8 +871,8 @@ h3 {
   }
 
   .brain-label {
-    font-size: 0.66rem;
-    padding: 0.34rem 0.44rem;
+  font-size: 0.66rem;
+  padding: 0.34rem 0.44rem;
   }
 }
 
@@ -878,7 +883,7 @@ h3 {
   }
 
   .action-row {
-    display: grid;
+  display: grid;
     grid-template-columns: 1fr;
   }
 
@@ -927,10 +932,12 @@ h3 {
 
 .bullseye-frame {
   margin: 0;
+  padding: clamp(0.5rem, 2vw, 1.5rem);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--surface);
-    overflow: hidden;
+  border-radius: var(--radius-lg);
+  background: rgba(5, 7, 13, 0.5);
+  backdrop-filter: blur(6px);
+  overflow: hidden;
 }
 
 .bullseye-frame img {
@@ -1118,7 +1125,6 @@ h3 {
   display: grid;
   gap: 0.5rem;
   margin-bottom: 1rem;
-  min-height: 3rem;
 }
 
 .readout-empty {
@@ -1275,5 +1281,59 @@ h3 {
   .hud-row {
     grid-template-columns: minmax(0, 1fr);
     gap: 0;
+  }
+}
+
+/* ---------- Motion ---------- */
+
+.reveal {
+  opacity: 0;
+  transform: translateY(12px);
+  transition:
+    opacity 380ms cubic-bezier(0.2, 0.8, 0.2, 1) var(--reveal-delay, 0ms),
+    transform 380ms cubic-bezier(0.2, 0.8, 0.2, 1) var(--reveal-delay, 0ms);
+}
+
+.reveal.is-revealed {
+  opacity: 1;
+  transform: none;
+}
+
+/* A scan line crossing the control on hover, and a ring that draws rather than appears. */
+.chip {
+  position: relative;
+  overflow: hidden;
+}
+
+.chip::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    rgba(65, 212, 200, 0.16) 50%,
+    transparent 70%
+  );
+  transform: translateX(-120%);
+  transition: transform 520ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.chip:hover::after,
+.chip:focus-visible::after {
+  transform: translateX(120%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* A complete path, not a degraded one: everything arrives, nothing travels. */
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .chip::after {
+    display: none;
   }
 }
