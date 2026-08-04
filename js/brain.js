@@ -1,6 +1,12 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { STRUCTURE_SEQUENCE, getStructure, getSelectableStructures } from './data.js';
+import {
+  BEAM_DEFS,
+  BEAM_SEQUENCE,
+  STRUCTURES,
+  getStructure,
+  getSymptom,
+} from './data.js';
 
 const ACCENT = 0xff7a45;
 const Y_AXIS = new THREE.Vector3(0, 1, 0);
@@ -24,6 +30,10 @@ const CAMERA_PRESETS = {
     target: [-0.08, -0.07, 0],
   },
   structures: {
+    position: [1.55, 0.75, 1.88],
+    target: [0.01, -0.12, 0.02],
+  },
+  simulator: {
     position: [1.55, 0.75, 1.88],
     target: [0.01, -0.12, 0.02],
   },
@@ -55,6 +65,24 @@ function clamp(value, min = 0, max = 1) {
 
 function easeInOutCubic(t) {
   return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+const BEAM_TRAVEL_IN = 620;
+const BEAM_DWELL = 460;
+const BEAM_TRAVEL_OUT = 620;
+export const BEAM_DURATION = BEAM_TRAVEL_IN + BEAM_DWELL + BEAM_TRAVEL_OUT;
+
+// Progress 0.5 is the structure itself, so the cursor holds there while the
+// reader takes in the label that has just appeared.
+function beamTimeline(elapsed) {
+  if (elapsed < BEAM_TRAVEL_IN) {
+    return { progress: easeInOutCubic(elapsed / BEAM_TRAVEL_IN) * 0.5, crossed: false };
+  }
+  if (elapsed < BEAM_TRAVEL_IN + BEAM_DWELL) {
+    return { progress: 0.5, crossed: true };
+  }
+  const t = clamp((elapsed - BEAM_TRAVEL_IN - BEAM_DWELL) / BEAM_TRAVEL_OUT);
+  return { progress: 0.5 + easeInOutCubic(t) * 0.5, crossed: true };
 }
 
 function smoothstep(edge0, edge1, value) {
@@ -374,13 +402,12 @@ export class BrainScene {
     this.container = container;
     this.mode = options.mode ?? 'structures';
     this.reducedMotion = Boolean(options.reducedMotion);
-    this.activeId = null;
+    this.activeIds = [];
     this.cameraFrame = null;
-    this.beamFrame = null;
-    this.beamResolve = null;
     this.sequenceToken = 0;
     this.markers = new Map();
     this.beams = new Map();
+    this.beamAnimations = new Map();
     this.labels = [];
     this.tmpVector = new THREE.Vector3();
 
@@ -450,7 +477,10 @@ export class BrainScene {
   }
 
   updateRunState() {
-    const shouldRun = this.isVisible && document.visibilityState !== 'hidden';
+    // A cursor already in flight keeps the loop alive even if the reader
+    // scrolls away, so its label still resolves instead of freezing.
+    const busy = this.beamAnimations.size > 0;
+    const shouldRun = (this.isVisible || busy) && document.visibilityState !== 'hidden';
     if (shouldRun && !this.running) {
       this.running = true;
       this.frame = requestAnimationFrame(this.render);
@@ -615,7 +645,7 @@ export class BrainScene {
     const markerGeometry = new THREE.SphereGeometry(0.038, 32, 16);
     const haloGeometry = new THREE.SphereGeometry(0.098, 32, 16);
 
-    getSelectableStructures().forEach((structure) => {
+    STRUCTURES.forEach((structure) => {
       const markerGroup = new THREE.Group();
       markerGroup.position.copy(vectorFromArray(structure.position));
       markerGroup.visible = false;
@@ -653,13 +683,17 @@ export class BrainScene {
   }
 
   createBeams() {
-    const structures = getSelectableStructures();
     const beamGeometry = new THREE.CylinderGeometry(1, 1, 1, 28, 1, true);
     const flareGeometry = new THREE.SphereGeometry(0.075, 32, 16);
+    const cursorGeometry = new THREE.SphereGeometry(0.034, 24, 16);
+    const cursorHaloGeometry = new THREE.SphereGeometry(0.082, 24, 16);
 
-    structures.forEach((structure) => {
+    BEAM_DEFS.forEach((symptom) => {
+      const structure = getStructure(symptom.structureId);
+      if (!structure) return;
+
       const target = vectorFromArray(structure.position);
-      const sourceAxis = vectorFromArray(structure.beamDir).normalize();
+      const sourceAxis = vectorFromArray(symptom.beamDir).normalize();
       const source = target.clone().add(sourceAxis.clone().multiplyScalar(1.52));
       const travel = sourceAxis.clone().multiplyScalar(-1).normalize();
       const fullLength = 3.04;
@@ -668,32 +702,40 @@ export class BrainScene {
       const group = new THREE.Group();
       group.visible = false;
 
+      // The line never changes length; because its midpoint is the target, a
+      // cursor travelling 0 to 1 crosses the structure at exactly 0.5.
       const haloMaterial = new THREE.MeshBasicMaterial({
         color: ACCENT,
         transparent: true,
-        opacity: 0.18,
+        opacity: 0.1,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
       });
       const halo = new THREE.Mesh(beamGeometry, haloMaterial);
+      halo.position.copy(target);
+      halo.quaternion.copy(quaternion);
+      halo.scale.set(0.05, fullLength, 0.05);
       halo.renderOrder = 11;
       group.add(halo);
 
       const coreMaterial = new THREE.MeshBasicMaterial({
         color: ACCENT,
         transparent: true,
-        opacity: 0.88,
+        opacity: 0.32,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
       });
       const core = new THREE.Mesh(beamGeometry, coreMaterial);
+      core.position.copy(target);
+      core.quaternion.copy(quaternion);
+      core.scale.set(0.011, fullLength, 0.011);
       core.renderOrder = 12;
       group.add(core);
 
       const sourceMaterial = new THREE.MeshBasicMaterial({
         color: ACCENT,
         transparent: true,
-        opacity: 0.2,
+        opacity: 0.16,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
       });
@@ -714,23 +756,48 @@ export class BrainScene {
       flare.renderOrder = 14;
       group.add(flare);
 
+      const cursorHaloMaterial = new THREE.MeshBasicMaterial({
+        color: ACCENT,
+        transparent: true,
+        opacity: 0.22,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      const cursorHalo = new THREE.Mesh(cursorHaloGeometry, cursorHaloMaterial);
+      cursorHalo.renderOrder = 15;
+      group.add(cursorHalo);
+
+      const cursorMaterial = new THREE.MeshBasicMaterial({
+        color: 0xfff2e6,
+        transparent: true,
+        opacity: 0.98,
+        depthWrite: false,
+      });
+      const cursor = new THREE.Mesh(cursorGeometry, cursorMaterial);
+      cursor.renderOrder = 16;
+      group.add(cursor);
+
       this.root.add(group);
-      this.beams.set(structure.id, {
+      this.beams.set(symptom.id, {
         group,
         source,
         travel,
         fullLength,
-        quaternion,
+        target,
         core,
         halo,
         sourceGlow,
         flare,
+        cursor,
+        cursorHalo,
         coreMaterial,
         haloMaterial,
         sourceMaterial,
         flareMaterial,
+        cursorMaterial,
+        cursorHaloMaterial,
       });
-      this.setBeamProgress(structure.id, 0);
+      this.setBeamCursor(symptom.id, 0);
     });
   }
 
@@ -783,46 +850,44 @@ export class BrainScene {
     this.markers.forEach((_, id) => this.setMarkerVisible(id, false));
   }
 
-  setBeamProgress(id, progress) {
+  setBeamVisible(id, visible) {
+    const beam = this.beams.get(id);
+    if (!beam) return;
+    beam.group.visible = visible;
+    if (!visible) beam.flareMaterial.opacity = 0;
+  }
+
+  setBeamCursor(id, progress) {
     const beam = this.beams.get(id);
     if (!beam) return;
 
     const safeProgress = clamp(progress);
-    const visible = safeProgress > 0.006;
-    beam.group.visible = visible;
-
-    if (!visible) {
-      beam.flareMaterial.opacity = 0;
-      return;
-    }
-
-    const length = Math.max(beam.fullLength * safeProgress, 0.001);
-    const center = beam.source
+    const point = beam.source
       .clone()
-      .add(beam.travel.clone().multiplyScalar(length * 0.5));
+      .add(beam.travel.clone().multiplyScalar(beam.fullLength * safeProgress));
 
-    beam.core.position.copy(center);
-    beam.core.quaternion.copy(beam.quaternion);
-    beam.core.scale.set(0.014, length, 0.014);
+    beam.cursor.position.copy(point);
+    beam.cursorHalo.position.copy(point);
 
-    beam.halo.position.copy(center);
-    beam.halo.quaternion.copy(beam.quaternion);
-    beam.halo.scale.set(0.052, length, 0.052);
-
-    const crossIn = smoothstep(0.44, 0.52, safeProgress);
-    const crossOut = 1 - smoothstep(0.62, 0.9, safeProgress);
-    const flareStrength = crossIn * crossOut;
-    beam.flareMaterial.opacity = 0.3 * flareStrength;
-    beam.flare.scale.setScalar(1 + 2.8 * flareStrength);
-    beam.sourceMaterial.opacity = 0.12 + 0.12 * Math.min(safeProgress * 1.4, 1);
+    // Everything brightens as the cursor passes through the structure.
+    const nearness = 1 - clamp(Math.abs(safeProgress - 0.5) / 0.14);
+    const strength = smoothstep(0, 1, nearness);
+    beam.flareMaterial.opacity = 0.34 * strength;
+    beam.flare.scale.setScalar(1 + 2.6 * strength);
+    beam.cursorHaloMaterial.opacity = 0.2 + 0.42 * strength;
+    beam.cursorHalo.scale.setScalar(1 + 0.5 * strength);
+    beam.coreMaterial.opacity = 0.3 + 0.24 * strength;
   }
 
   hideBeams() {
-    this.beams.forEach((_, id) => this.setBeamProgress(id, 0));
+    this.beams.forEach((_, id) => {
+      this.setBeamVisible(id, false);
+      this.setBeamCursor(id, 0);
+    });
   }
 
   clearActive() {
-    this.activeId = null;
+    this.activeIds = [];
     this.stopAnimations();
     this.hideMarkers();
     this.hideBeams();
@@ -833,19 +898,59 @@ export class BrainScene {
       cancelAnimationFrame(this.cameraFrame);
       this.cameraFrame = null;
     }
-    if (this.beamFrame) {
-      cancelAnimationFrame(this.beamFrame);
-      this.beamFrame = null;
-    }
-    if (this.beamResolve) {
-      this.beamResolve();
-      this.beamResolve = null;
-    }
+    this.beamAnimations.forEach((animation) => animation.resolve?.());
+    this.beamAnimations.clear();
   }
 
-  revealStructure(id, options = {}) {
-    const structure = getStructure(id);
-    if (!structure || structure.noBeam || this.mode === 'overview') {
+  // One cursor pass: travel to the structure, hold there long enough for its
+  // label to be read, then continue to the far side.
+  startBeam(id, options = {}) {
+    return new Promise((resolve) => {
+      if (!this.beams.has(id)) {
+        resolve();
+        return;
+      }
+      this.setBeamVisible(id, true);
+      this.setBeamCursor(id, 0);
+      this.beamAnimations.set(id, {
+        startedAt: performance.now() + (options.delay ?? 0),
+        onCross: options.onCross,
+        crossed: false,
+        resolve,
+      });
+      this.updateRunState();
+    });
+  }
+
+  tickBeams(now) {
+    if (!this.beamAnimations.size) return;
+
+    this.beamAnimations.forEach((animation, id) => {
+      const elapsed = now - animation.startedAt;
+      if (elapsed < 0) return;
+
+      const { progress, crossed } = beamTimeline(elapsed);
+      this.setBeamCursor(id, progress);
+
+      if (crossed && !animation.crossed) {
+        animation.crossed = true;
+        animation.onCross?.(id);
+      }
+
+      if (elapsed >= BEAM_DURATION) {
+        this.beamAnimations.delete(id);
+        animation.resolve?.();
+        if (!this.beamAnimations.size) this.updateRunState();
+      }
+    });
+  }
+
+  revealSymptoms(ids, options = {}) {
+    if (this.mode === 'overview') return Promise.resolve();
+
+    const list = (Array.isArray(ids) ? ids : [ids]).filter((id) => this.beams.has(id));
+    if (!list.length) {
+      this.clearActive();
       return Promise.resolve();
     }
 
@@ -853,18 +958,33 @@ export class BrainScene {
     this.stopAnimations();
     this.hideMarkers();
     this.hideBeams();
-    this.activeId = id;
-    this.setMarkerVisible(id, true);
+    this.activeIds = list;
 
-    const preset = CAMERA_PRESETS[id] ?? CAMERA_PRESETS.structures;
+    list.forEach((id) => {
+      const symptom = getSymptom(id);
+      if (symptom) this.setMarkerVisible(symptom.structureId, true);
+    });
+
+    const single = list.length === 1 ? getSymptom(list[0]) : null;
+    const preset =
+      (single && CAMERA_PRESETS[single.structureId]) ?? CAMERA_PRESETS[this.mode] ?? CAMERA_PRESETS.structures;
     this.moveCameraTo(preset, this.reducedMotion || options.instant ? 0 : 760);
 
     if (this.reducedMotion || options.instant) {
-      this.setBeamProgress(id, 1);
+      list.forEach((id) => {
+        this.setBeamVisible(id, true);
+        this.setBeamCursor(id, 1);
+        options.onCross?.(id);
+      });
       return Promise.resolve();
     }
 
-    return this.animateBeam(id, options.duration ?? 1180);
+    // Stagger so several cursors reach their structures in reading order.
+    return Promise.all(
+      list.map((id, index) =>
+        this.startBeam(id, { delay: index * 260, onCross: options.onCross }),
+      ),
+    );
   }
 
   moveCameraTo(preset, duration = 0) {
@@ -909,35 +1029,7 @@ export class BrainScene {
     this.cameraFrame = requestAnimationFrame(step);
   }
 
-  animateBeam(id, duration) {
-    if (this.beamFrame) {
-      cancelAnimationFrame(this.beamFrame);
-      this.beamFrame = null;
-    }
-
-    return new Promise((resolve) => {
-      this.beamResolve = resolve;
-      const startedAt = performance.now();
-      const step = (now) => {
-        const elapsed = now - startedAt;
-        const progress = easeInOutCubic(clamp(elapsed / duration));
-        this.setBeamProgress(id, progress);
-
-        if (progress < 1) {
-          this.beamFrame = requestAnimationFrame(step);
-        } else {
-          this.beamFrame = null;
-          this.beamResolve = null;
-          resolve();
-        }
-      };
-
-      this.setBeamProgress(id, 0);
-      this.beamFrame = requestAnimationFrame(step);
-    });
-  }
-
-  async playSequence(ids = STRUCTURE_SEQUENCE) {
+  async playSequence(ids = BEAM_SEQUENCE, options = {}) {
     if (this.reducedMotion) {
       this.showAllBeams();
       return true;
@@ -949,12 +1041,12 @@ export class BrainScene {
 
     for (const id of ids) {
       if (token !== this.sequenceToken) return false;
-      await this.revealStructure(id, {
+      await this.revealSymptoms([id], {
         sequenceStep: true,
-        duration: 1020,
+        onCross: options.onCross,
       });
       if (token !== this.sequenceToken) return false;
-      await new Promise((resolve) => window.setTimeout(resolve, 260));
+      await new Promise((resolve) => window.setTimeout(resolve, 200));
     }
 
     return token === this.sequenceToken;
@@ -963,14 +1055,16 @@ export class BrainScene {
   showAllBeams() {
     this.sequenceToken += 1;
     this.stopAnimations();
-    this.activeId = null;
+    this.activeIds = [...BEAM_SEQUENCE];
     this.hideMarkers();
     this.hideBeams();
     this.moveCameraTo(CAMERA_PRESETS.angles, this.reducedMotion ? 0 : 520);
 
-    STRUCTURE_SEQUENCE.forEach((id) => {
-      this.setMarkerVisible(id, true);
-      this.setBeamProgress(id, 1);
+    BEAM_SEQUENCE.forEach((id) => {
+      const symptom = getSymptom(id);
+      if (symptom) this.setMarkerVisible(symptom.structureId, true);
+      this.setBeamVisible(id, true);
+      this.setBeamCursor(id, 1);
     });
   }
 
@@ -995,6 +1089,7 @@ export class BrainScene {
 
   render() {
     if (!this.running) return;
+    this.tickBeams(performance.now());
     this.controls?.update();
     this.updateLabels();
     this.renderer.render(this.scene, this.camera);

@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Migraine Companion</title>
+    <title>Migraine Companion 1: Energy Impact Simulator</title>
     <meta
       name="description"
-      content="A static interactive 3D companion that visualizes the Prodrome Zone and angle-of-force migraine theory."
+      content="An interactive 3D companion that visualizes the Migraine Prodrome Zone and the angle-of-force migraine theory."
     />
     <link rel="stylesheet" href="./css/style.css" />
     <script type="importmap">
@@ -40,7 +40,9 @@
         </button>
         <div class="nav-links" id="nav-links">
           <a href="#prodrome-zone">Prodrome Zone</a>
+          <a href="#simulator">Simulator</a>
           <a href="#structures">Structures</a>
+          <a href="#pineal-body">Pineal Body</a>
           <a href="#angles-of-force">Angles</a>
         </div>
       </nav>
@@ -50,20 +52,15 @@
       <section class="hero section" id="hero" aria-labelledby="hero-title">
         <div class="section-inner hero-grid">
           <div class="hero-copy">
-            <!-- TODO: final title -->
-            <h1 id="hero-title">Migraine Companion</h1>
-            <p class="hero-thesis">
-              This companion presents the theory that migraine can begin when an
-              energy force enters the deep-brain Prodrome Zone at a specific angle. The
-              model keeps established anatomy separate from the hypothesis, letting readers
-              explore how different angle paths may map to different warning signs before
-              migraine onset.
-            </p>
+            <p class="eyebrow" data-copy="hero-eyebrow"></p>
+            <h1 id="hero-title" data-copy="hero-title"></h1>
+            <p class="hero-thesis" data-copy="hero-thesis"></p>
+            <p class="medical-note" data-copy="hero-disclaimer"></p>
           </div>
-          <figure class="timeline-frame">
+          <figure class="bullseye-frame">
             <img
-              src="./assets/phases-timeline.svg"
-              alt="Migraine phases timeline: Prodrome 1 hour to 48 hours, Aura 5 minutes to 1 hour, Headache 4 to 72 hours, and Resolution 1 to 2 days."
+              src="./assets/prodrome-bullseye.svg"
+              alt="Bullseye diagram titled Prodrome Zone, with the pineal body, thalamus, and hypothalamus as concentric rings around a central target."
             />
           </figure>
         </div>
@@ -73,7 +70,7 @@
         <div class="section-inner split-layout">
           <div class="copy-column">
             <p class="section-number">01</p>
-            <h2 id="prodrome-title">The Prodrome Zone</h2>
+            <h2 id="prodrome-title" data-copy="prodrome-title"></h2>
             <p class="section-hook" data-copy="prodrome-hook"></p>
             <p data-copy="prodrome-blurb"></p>
             <p class="caption" data-copy="prodrome-caption"></p>
@@ -91,60 +88,130 @@
         </div>
       </section>
 
-      <section class="section model-section alt-section" id="structures" aria-labelledby="structures-title">
+      <section class="section model-section alt-section" id="simulator" aria-labelledby="simulator-title">
         <div class="section-inner">
           <div class="section-heading">
-            <p class="section-number">02-05</p>
-            <h2 id="structures-title">The Structures</h2>
+            <p class="section-number">02</p>
+            <h2 id="simulator-title">Energy Impact Simulator</h2>
+            <p class="section-hook">
+              Choose a migraine type, then enter the prodrome symptoms you experience.
+            </p>
+          </div>
+
+          <div class="accordion" data-accordion>
+            <div class="accordion-item">
+              <h3 class="accordion-heading">
+                <button
+                  class="accordion-trigger"
+                  type="button"
+                  data-accordion-trigger="no-aura"
+                  aria-expanded="false"
+                  aria-controls="panel-no-aura"
+                >
+                  <span class="accordion-index">Section 1</span>
+                  <span class="accordion-label">Migraine without Aura</span>
+                  <span class="accordion-icon" aria-hidden="true"></span>
+                </button>
+              </h3>
+              <div class="accordion-panel" id="panel-no-aura" data-accordion-panel="no-aura" hidden>
+                <div class="symptom-block" data-symptom-block="no-aura"></div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h3 class="accordion-heading">
+                <button
+                  class="accordion-trigger"
+                  type="button"
+                  data-accordion-trigger="aura"
+                  aria-expanded="false"
+                  aria-controls="panel-aura"
+                >
+                  <span class="accordion-index">Section 2</span>
+                  <span class="accordion-label">Migraine With Aura</span>
+                  <span class="accordion-icon" aria-hidden="true"></span>
+                </button>
+              </h3>
+              <div class="accordion-panel" id="panel-aura" data-accordion-panel="aura" hidden>
+                <p class="aura-note">* Specifically, the visual aura (scintillating scotoma type)</p>
+                <div class="symptom-block" data-symptom-block="aura"></div>
+              </div>
+            </div>
           </div>
 
           <div class="interactive-layout">
             <div class="module-column">
               <div
-                class="chip-list"
-                data-chip-list
-                role="toolbar"
-                aria-label="Prodrome Zone structures"
-              ></div>
-              <div
-                class="brain-stage brain-stage--structures"
-                data-brain="structures"
+                class="brain-stage brain-stage--simulator"
+                data-brain="simulator"
                 role="img"
-                aria-label="Rotatable 3D anatomical brain model with selectable force-beam targets."
+                aria-label="Rotatable 3D anatomical brain model. A fixed line runs through the selected structure while a cursor travels along it."
               >
                 <div class="brain-loading">Loading brain model...</div>
               </div>
             </div>
 
-            <aside class="detail-panel" aria-live="polite" aria-labelledby="structure-name">
-              <p class="panel-hook" id="structure-hook">No structure selected</p>
-              <h3 id="structure-name">Prodrome marker</h3>
-              <p class="symptom-line" id="structure-symptom">Choose a chip to reveal its angle.</p>
-              <p id="structure-blurb">
-                The module opens each structure as a discrete target, preserving the
-                angle-of-force hypothesis without free-aim controls.
-              </p>
-              <p class="caption" id="structure-caption"></p>
+            <aside class="detail-panel" aria-labelledby="sim-heading">
+              <p class="panel-hook" id="sim-heading">No symptom selected</p>
+              <div class="readout-list" data-readout aria-live="polite">
+                <p class="readout-empty">
+                  Open a section above and choose a symptom. Its name and brain region appear as the
+                  cursor reaches the structure.
+                </p>
+              </div>
+              <p class="panel-detail" data-sim-detail></p>
+            </aside>
+          </div>
+        </div>
+      </section>
 
-              <div class="zoom-callout" id="structure-callout" aria-hidden="true">
+      <section class="section" id="structures" aria-labelledby="structures-title">
+        <div class="section-inner">
+          <div class="section-heading">
+            <p class="section-number">03</p>
+            <h2 id="structures-title">The Structures</h2>
+            <p class="section-hook">
+              The neural neighborhood, one address at a time.
+            </p>
+          </div>
+
+          <div class="reference-layout">
+            <div class="chip-list" data-reference-list role="group" aria-label="Prodrome Zone structures"></div>
+
+            <div class="reference-panel">
+              <h3 id="reference-name" data-reference-name>Mood Alterations / Lateral tuberal nucleus</h3>
+              <p id="reference-detail" data-reference-detail></p>
+
+              <div class="zoom-callout" id="reference-callout">
                 <div class="nucleus-zoom" aria-hidden="true">
                   <span class="nucleus-dot"></span>
                   <span class="nucleus-beam"></span>
                 </div>
                 <div>
-                  <p class="callout-label">Circular nucleus view</p>
-                  <p id="callout-caption">A dotted marker appears here after selection.</p>
+                  <p class="callout-label" data-callout-label>Circular nucleus view</p>
+                  <p data-callout-caption>The angle of force through this structure.</p>
                 </div>
               </div>
-            </aside>
+            </div>
           </div>
+        </div>
+      </section>
+
+      <section class="section alt-section" id="pineal-body" aria-labelledby="pineal-title">
+        <div class="section-inner narrow-layout">
+          <p class="section-number">04</p>
+          <h2 id="pineal-title" data-copy="pineal-title"></h2>
+          <ul class="key-points" data-pineal-points></ul>
+          <p data-copy="pineal-blurb"></p>
+          <p data-copy="pineal-theory"></p>
+          <p class="caption" data-copy="pineal-caption"></p>
         </div>
       </section>
 
       <section class="section model-section" id="angles-of-force" aria-labelledby="angles-title">
         <div class="section-inner split-layout split-layout--reverse">
           <div class="copy-column">
-            <p class="section-number">06</p>
+            <p class="section-number">05</p>
             <h2 id="angles-title">Angles of Force</h2>
             <p class="section-hook" data-copy="angles-hook"></p>
             <p data-copy="angles-blurb"></p>
@@ -160,7 +227,7 @@
               class="brain-stage brain-stage--angles"
               data-brain="angles"
               role="img"
-              aria-label="Rotatable 3D anatomical brain model showing the distinct force-beam angles as a sequence or fan."
+              aria-label="Rotatable 3D anatomical brain model showing the distinct force angles as a sequence or fan."
             >
               <div class="brain-loading">Loading brain model...</div>
             </div>

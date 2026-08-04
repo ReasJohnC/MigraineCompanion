@@ -195,10 +195,11 @@ p {
 
 h1 {
   margin-bottom: 1.25rem;
-  font-size: clamp(3rem, 6.4vw, 6.3rem);
-  line-height: 0.95;
+  /* Sized so "Neighborhood" sets on one line inside .hero-copy. */
+  font-size: clamp(2.5rem, 4.6vw, 4.6rem);
+  line-height: 1.02;
   font-weight: 760;
-  max-width: 10.5ch;
+  max-width: 14ch;
 }
 
 h2 {
@@ -224,15 +225,6 @@ h3 {
 .hero-thesis {
   max-width: 58ch;
   font-size: clamp(1.05rem, 1.7vw, 1.25rem);
-}
-
-.timeline-frame {
-  margin: 0;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--surface);
-  box-shadow: var(--shadow);
-  overflow: hidden;
 }
 
 .model-section {
@@ -567,7 +559,7 @@ h3 {
   }
 
   h1 {
-    max-width: 11.5ch;
+    max-width: 15ch;
   }
 
   .detail-panel {
@@ -686,5 +678,361 @@ h3 {
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
     transition-duration: 0.001ms !important;
+  }
+}
+
+/* ---------- Hero: eyebrow, disclaimer, bullseye ---------- */
+
+.eyebrow {
+  margin-bottom: 0.75rem;
+  color: var(--accent-2-deep);
+  font-size: 0.82rem;
+  font-weight: 780;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.medical-note {
+  margin-top: 1.5rem;
+  padding-left: 0.95rem;
+  border-left: 3px solid var(--accent);
+  color: var(--text) !important;
+  font-style: italic;
+  font-weight: 640;
+  font-size: 0.98rem;
+  max-width: 52ch;
+}
+
+.bullseye-frame {
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.bullseye-frame img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* ---------- Simulator: accordion ---------- */
+
+.accordion {
+  display: grid;
+  gap: 0.85rem;
+  margin-bottom: clamp(2rem, 4vw, 3rem);
+}
+
+.accordion-item {
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.accordion-heading {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.accordion-trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  width: 100%;
+  padding: 1.05rem clamp(1rem, 2.5vw, 1.6rem);
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 160ms ease;
+}
+
+.accordion-trigger:hover {
+  background: var(--cool-tint);
+}
+
+.accordion-trigger:focus-visible {
+  outline: 2px solid var(--accent-2);
+  outline-offset: -3px;
+}
+
+.accordion-index {
+  color: var(--accent-2-deep);
+  font-size: 0.74rem;
+  font-weight: 780;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.accordion-label {
+  flex: 1;
+  font-size: clamp(1.05rem, 1.8vw, 1.28rem);
+  font-weight: 720;
+}
+
+.accordion-icon {
+  position: relative;
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+.accordion-icon::before,
+.accordion-icon::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  background: var(--accent-2-deep);
+  transform: translate(-50%, -50%);
+  transition: opacity 180ms ease;
+}
+
+.accordion-icon::before {
+  width: 14px;
+  height: 2px;
+}
+
+.accordion-icon::after {
+  width: 2px;
+  height: 14px;
+}
+
+.accordion-trigger[aria-expanded="true"] .accordion-icon::after {
+  opacity: 0;
+}
+
+.accordion-trigger[aria-expanded="true"] {
+  background: var(--cool-tint);
+}
+
+.accordion-panel {
+  padding: 0 clamp(1rem, 2.5vw, 1.6rem) 1.4rem;
+  border-top: 1px solid var(--line);
+}
+
+.aura-note {
+  margin: 1rem 0 0;
+  color: var(--accent-deep);
+  font-size: 0.92rem;
+  font-weight: 640;
+}
+
+/* ---------- Simulator: symptom controls ---------- */
+
+.symptom-block {
+  margin-top: 1.1rem;
+}
+
+.block-label {
+  margin-bottom: 0.6rem;
+  color: var(--text);
+  font-size: 0.86rem;
+  font-weight: 780;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.block-hint {
+  margin-top: -0.35rem;
+  margin-bottom: 0.7rem;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.combination-block {
+  margin-top: 1.6rem;
+  padding-top: 1.3rem;
+  border-top: 1px dashed var(--line-strong);
+}
+
+.check-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.check-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.9rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.94rem;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.check-chip:hover {
+  border-color: var(--accent-2);
+  color: var(--text);
+}
+
+.check-chip input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.check-chip:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--warm-tint);
+  color: var(--text);
+  font-weight: 640;
+}
+
+.check-chip:has(input:focus-visible) {
+  outline: 2px solid var(--accent-2);
+  outline-offset: 2px;
+}
+
+/* ---------- Simulator: readout ---------- */
+
+.readout-list {
+  display: grid;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  min-height: 3rem;
+}
+
+.readout-empty {
+  color: var(--muted) !important;
+  font-size: 0.95rem;
+}
+
+.readout-line {
+  padding: 0.55rem 0.75rem;
+  border-left: 3px solid var(--accent);
+  background: var(--warm-tint);
+  color: var(--text) !important;
+  font-size: 1rem;
+  font-weight: 700;
+  animation: readout-in 260ms ease both;
+}
+
+.readout-line--aura {
+  border-left-color: var(--accent-2);
+  background: var(--cool-tint);
+}
+
+@keyframes readout-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.panel-detail {
+  font-size: 0.95rem;
+}
+
+/* ---------- Structures reference ---------- */
+
+.reference-layout {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.9fr) minmax(320px, 1.1fr);
+  gap: clamp(1.5rem, 4vw, 3.5rem);
+  align-items: start;
+}
+
+.reference-layout .chip-list {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.reference-layout .chip {
+  text-align: left;
+}
+
+.reference-panel {
+  border-left: 1px solid var(--line-strong);
+  padding-left: clamp(1.25rem, 3vw, 2rem);
+}
+
+.reference-panel h3 {
+  margin-bottom: 0.8rem;
+  font-size: clamp(1.1rem, 1.9vw, 1.35rem);
+  font-weight: 760;
+}
+
+.reference-panel p {
+  color: var(--muted);
+}
+
+.reference-panel .zoom-callout {
+  opacity: 1;
+  transform: none;
+}
+
+/* ---------- Pineal body ---------- */
+
+.narrow-layout {
+  max-width: 72ch;
+}
+
+.narrow-layout p {
+  color: var(--muted);
+}
+
+.narrow-layout cite {
+  font-style: italic;
+  font-weight: 640;
+  color: var(--text);
+}
+
+.key-points {
+  margin: 0 0 1.4rem;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.key-points li {
+  position: relative;
+  padding-left: 1.5rem;
+  color: var(--text);
+  font-weight: 700;
+}
+
+.key-points li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.55em;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+@media (max-width: 880px) {
+  .reference-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .reference-panel {
+    border-left: 0;
+    border-top: 1px solid var(--line-strong);
+    padding-left: 0;
+    padding-top: 1.4rem;
+  }
+
+  .reference-layout .chip-list {
+    flex-direction: row;
+    flex-wrap: wrap;
   }
 }

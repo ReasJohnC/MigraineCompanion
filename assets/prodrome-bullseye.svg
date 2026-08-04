@@ -1,0 +1,54 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 640 380"
+  role="img"
+  aria-labelledby="bullseye-title bullseye-desc"
+  font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif"
+>
+  <title id="bullseye-title">Prodrome Zone</title>
+  <desc id="bullseye-desc">
+    A bullseye marking the deep-brain target of the theory: the thalamus, hypothalamus, and pineal
+    body.
+  </desc>
+
+  <rect width="640" height="380" fill="#ffffff" />
+
+  <text
+    x="320"
+    y="52"
+    text-anchor="middle"
+    fill="#172a2f"
+    font-size="23"
+    font-weight="700"
+    letter-spacing="0.01em"
+  >Prodrome Zone</text>
+
+  <g transform="translate(320 205)" fill="none" stroke="#bfd0d4" stroke-width="1.4">
+    <circle r="132" />
+    <circle r="102" />
+    <circle r="72" />
+    <circle r="42" />
+  </g>
+
+  <g stroke="#d8e2e4" stroke-width="1.2" stroke-linecap="round">
+    <line x1="320" y1="43" x2="320" y2="63" />
+    <line x1="320" y1="347" x2="320" y2="367" />
+    <line x1="168" y1="205" x2="188" y2="205" />
+    <line x1="452" y1="205" x2="472" y2="205" />
+  </g>
+
+  <g transform="translate(320 205)">
+    <circle r="26" fill="#ff7a45" opacity="0.16" />
+    <circle r="13" fill="#ff7a45" />
+    <circle r="13" fill="none" stroke="#b3461f" stroke-width="1.2" opacity="0.55" />
+  </g>
+
+  <text
+    x="320"
+    y="360"
+    text-anchor="middle"
+    fill="#566b72"
+    font-size="14.5"
+    letter-spacing="0.02em"
+  >thalamus · hypothalamus · pineal body</text>
+</svg>
