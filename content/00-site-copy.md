@@ -9,6 +9,15 @@ on-page text.
 Author's spelling of "Mood Alterations" follows "Text for JC_2"; the first document had
 "Alternations", confirmed as a typo.
 
+"Migraine with Aura" is set with a lowercase "with" throughout. The author's documents have
+both casings ("without Aura" in one place, "With Aura" in another) and both were on screen at
+once; the lowercase form matches the author's own Section 1 heading.
+
+The accordion no longer prints "Section 1" / "Section 2" above the two migraine types. The page
+numbers its own sections 01–05, so three numbering systems were visible in one viewport. The
+names carry the distinction on their own. The author's phrasing of the hard constraint below
+still refers to Section 1 — that is the *Migraine without Aura* accordion item.
+
 **Voice.** All copy describes what happens in the brain, not what the page is doing. Phrases
 like "this companion presents", "the simulator lets readers explore", and "shown here in a 3D
 view" were rewritten on John's instruction. Deliberately left alone: the author's book
@@ -132,6 +141,25 @@ symptoms.
 
 **Caption:** The theory: different force angles select different deep-brain targets, shaping
 the expression of different warning signs before migraine.
+
+## Footer
+
+The footer repeats the medical disclaimer verbatim and restores the author's original hero
+sentence as the site's plainest statement that this is a proposed theory:
+
+> This companion presents an illustration of the theory that migraine can begin when an energy
+> force enters the deep-brain Migraine Prodrome Zone at specific angles.
+
+That sentence was cut from the hero for speaking in the page's voice rather than the brain's.
+The footer is where page-voice belongs — the same exemption the book citations already have —
+and the sentence is the author's own, unedited.
+
+The citation reuses the author's sentence from the lateral tuberal description: "See *On the
+Other Side of Migraine* by this author for a complete description and rationale for all of the
+concepts presented here."
+
+**Open:** the author is credited only as "this author". Their name does not appear anywhere in
+the repository, so no byline was invented. `PAGE_COPY.footer` is where it goes when supplied.
 
 ## Open item
 

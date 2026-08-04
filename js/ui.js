@@ -45,8 +45,20 @@ function safeStore(value) {
   }
 }
 
+// Renders the book title as a <cite>, or as a link once the author supplies a URL.
+function citeBook(title, url) {
+  const cite = document.createElement('cite');
+  cite.textContent = title;
+  if (!url) return cite;
+  const link = document.createElement('a');
+  link.href = url;
+  link.rel = 'noopener';
+  link.appendChild(cite);
+  return link;
+}
+
 function initCopy() {
-  const { hero, prodromeZone, pineal, angles } = PAGE_COPY;
+  const { hero, prodromeZone, pineal, angles, footer } = PAGE_COPY;
 
   setText('[data-copy="hero-eyebrow"]', hero.eyebrow);
   setText('[data-copy="hero-title"]', hero.title);
@@ -65,9 +77,7 @@ function initCopy() {
   const theory = document.querySelector('[data-copy="pineal-theory"]');
   if (theory) {
     theory.textContent = `${pineal.theory} `;
-    const cite = document.createElement('cite');
-    cite.textContent = pineal.bookTitle;
-    theory.appendChild(cite);
+    theory.appendChild(citeBook(pineal.bookTitle, footer.bookUrl));
     theory.appendChild(document.createTextNode('.'));
   }
 
@@ -83,6 +93,16 @@ function initCopy() {
   setText('[data-copy="angles-hook"]', angles.hook);
   setText('[data-copy="angles-blurb"]', angles.blurb);
   setText('[data-copy="angles-caption"]', angles.caption);
+
+  setText('[data-copy="footer-framing"]', footer.framing);
+  setText('[data-copy="footer-disclaimer"]', hero.disclaimer);
+
+  const citation = document.querySelector('[data-copy="footer-citation"]');
+  if (citation) {
+    citation.textContent = `${footer.citation} `;
+    citation.appendChild(citeBook(footer.bookTitle, footer.bookUrl));
+    citation.appendChild(document.createTextNode(` ${footer.citationTail}`));
+  }
 }
 
 function initNavigation() {
@@ -432,7 +452,7 @@ function initAnglesModule(anglesScene) {
 
   showAllButton?.addEventListener('click', () => {
     anglesScene.showAllBeams();
-    if (status) status.textContent = 'Five angles through one crossing: every path the force can take.';
+    if (status) status.textContent = 'Five angles, four targets: every path the force can take.';
   });
 }
 

@@ -109,6 +109,20 @@ export const PAGE_COPY = {
     caption:
       'The pineal body times melatonin — and, struck at its own distinct angle, sets off the visual aura.',
   },
+  footer: {
+    // The author's original hero sentence, which was cut from the hero for speaking in
+    // the page's voice. The footer is where page-voice belongs, and it is the plainest
+    // statement on the site that this is a proposed theory rather than settled science.
+    framing:
+      'This companion presents an illustration of the theory that migraine can begin when an energy force enters the deep-brain Migraine Prodrome Zone at specific angles.',
+    citation: 'See',
+    citationTail:
+      'by this author for a complete description and rationale for all of the concepts presented here.',
+    bookTitle: 'On the Other Side of Migraine',
+    // TODO(author): Amazon URL for On the Other Side of Migraine — deferred at the
+    // author's request. Setting this to a string turns both citations into links.
+    bookUrl: null,
+  },
   angles: {
     hook: 'Many possible warning symptoms via prodromes.',
     blurb:

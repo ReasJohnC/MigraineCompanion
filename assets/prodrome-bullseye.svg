@@ -7,8 +7,8 @@
 >
   <title id="bullseye-title">Prodrome Zone</title>
   <desc id="bullseye-desc">
-    A bullseye marking the deep-brain target of the theory: the thalamus, hypothalamus, and pineal
-    body.
+    Four concentric rings with crosshair ticks around a small orange centre, marking the
+    deep-brain target of the theory: the thalamus, hypothalamus, and pineal body.
   </desc>
 
   <rect width="640" height="380" fill="#ffffff" />
@@ -24,23 +24,24 @@
   >Prodrome Zone</text>
 
   <g transform="translate(320 205)" fill="none" stroke="#bfd0d4" stroke-width="1.4">
-    <circle r="132" />
-    <circle r="102" />
-    <circle r="72" />
-    <circle r="42" />
+    <circle r="120" />
+    <circle r="94" />
+    <circle r="66" />
+    <circle r="38" />
   </g>
 
+  <!-- Ticks straddle the outer ring; they must clear the title above and the caption below. -->
   <g stroke="#d8e2e4" stroke-width="1.2" stroke-linecap="round">
-    <line x1="320" y1="43" x2="320" y2="63" />
-    <line x1="320" y1="347" x2="320" y2="367" />
-    <line x1="168" y1="205" x2="188" y2="205" />
-    <line x1="452" y1="205" x2="472" y2="205" />
+    <line x1="320" y1="75" x2="320" y2="95" />
+    <line x1="320" y1="315" x2="320" y2="335" />
+    <line x1="190" y1="205" x2="210" y2="205" />
+    <line x1="430" y1="205" x2="450" y2="205" />
   </g>
 
   <g transform="translate(320 205)">
-    <circle r="26" fill="#ff7a45" opacity="0.16" />
-    <circle r="13" fill="#ff7a45" />
-    <circle r="13" fill="none" stroke="#b3461f" stroke-width="1.2" opacity="0.55" />
+    <circle r="24" fill="#ff7a45" opacity="0.16" />
+    <circle r="12" fill="#ff7a45" />
+    <circle r="12" fill="none" stroke="#b3461f" stroke-width="1.2" opacity="0.55" />
   </g>
 
   <text

@@ -160,6 +160,10 @@ a {
   border-bottom: 1px solid rgba(215, 228, 231, 0.78);
 }
 
+main > section {
+  scroll-margin-top: calc(var(--nav-height) + 24px);
+}
+
 .section-inner {
   width: min(1180px, calc(100% - 32px));
   margin: 0 auto;
@@ -247,12 +251,31 @@ h3 {
   grid-template-columns: minmax(360px, 0.86fr) minmax(420px, 1.14fr);
 }
 
+/* The number owns its own row so it stays above the heading, and the heading stays on
+   the page's left rail, matching the sections that lay their copy out in a column. */
 .section-heading {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1.12fr) minmax(0, 0.88fr);
+  grid-template-areas:
+    "num num"
+    "title hook";
   align-items: end;
-  justify-content: space-between;
-  gap: 1rem;
+  column-gap: clamp(1.5rem, 4vw, 3.5rem);
   margin-bottom: clamp(1.7rem, 4vw, 3rem);
+}
+
+.section-heading .section-number {
+  grid-area: num;
+}
+
+.section-heading h2 {
+  grid-area: title;
+  margin-bottom: 0;
+}
+
+.section-heading .section-hook {
+  grid-area: hook;
+  margin-bottom: 0;
 }
 
 .section-number {
@@ -537,13 +560,40 @@ h3 {
 }
 
 .site-footer {
-  padding: 2rem 0;
+  padding: clamp(2.5rem, 5vw, 4rem) 0;
+  background: var(--bg-soft);
   color: var(--muted);
   font-size: 0.92rem;
 }
 
+.footer-grid {
+  display: grid;
+  gap: 1rem;
+  max-width: 72ch;
+}
+
 .site-footer p {
   margin: 0;
+}
+
+.footer-note {
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.footer-disclaimer {
+  padding-left: 0.95rem;
+  border-left: 3px solid var(--accent);
+  color: var(--text);
+  font-style: italic;
+  font-weight: 640;
+  font-size: 0.98rem;
+}
+
+.footer-citation cite {
+  font-style: italic;
+  font-weight: 640;
+  color: var(--text);
 }
 
 @media (max-width: 900px) {
@@ -560,6 +610,18 @@ h3 {
 
   h1 {
     max-width: 15ch;
+  }
+
+  .section-heading {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "num"
+      "title"
+      "hook";
+  }
+
+  .section-heading h2 {
+    margin-bottom: 0.75rem;
   }
 
   .detail-panel {
@@ -760,15 +822,6 @@ h3 {
 .accordion-trigger:focus-visible {
   outline: 2px solid var(--accent-2);
   outline-offset: -3px;
-}
-
-.accordion-index {
-  color: var(--accent-2-deep);
-  font-size: 0.74rem;
-  font-weight: 780;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  white-space: nowrap;
 }
 
 .accordion-label {
