@@ -6,7 +6,10 @@ companion's hypothesis that a migraine can begin when an "energy force" enters a
 producing different prodrome (pre-migraine) symptoms.
 
 ## What's here
-- `index.html`, `css/`, `js/`, `assets/` — the site (100% static; Three.js loaded via CDN).
+- `index.html`, `css/`, `js/`, `assets/` — the site (100% static; Three.js 0.160.1 is
+  vendored in `js/vendor/`, so nothing is fetched from any external host — with the CDN,
+  one unreachable host cost the page all of its copy, since the text is injected by the
+  same module graph).
 - `content/` — source draft copy per structure (the site text is built from these).
 - `BUILD-SPEC.md` — the build specification, updated for the dark-instrument direction.
 - `ai/plans/` — the 2026-08-03 audit and redesign plan. `ai/verify/` — the harness that
@@ -63,7 +66,12 @@ Still open: an Amazon link for *On the Other Side of Migraine*, deferred by the 
 - The line is stationary and a cursor travels along it, revealing the symptom and brain region
   as it reaches the structure. It holds there briefly so the label can be read.
 - Respects `prefers-reduced-motion` (label and final state appear at once, no travel);
-  keyboard-accessible; responsive down to mobile.
+  keyboard-accessible; responsive down to mobile. The stage window keeps
+  `touch-action: pan-y` (re-asserted after OrbitControls sets `none`), so one-finger
+  vertical swipes scroll the page and horizontal drags orbit. The canvas holds `100lvh`
+  so mobile toolbar collapse never resizes it mid-scroll.
+- Favicons: SVG for modern browsers, `/favicon.ico` for Safari (which ignores SVG icons),
+  and a solid-ground `apple-touch-icon`.
 - No backend, no analytics, no external data. State (last selection) is `localStorage` only.
 - **One WebGL context** for the whole page: a fixed, full-bleed canvas behind the document,
   with the camera driven along a spline through per-section keyframes as you scroll.

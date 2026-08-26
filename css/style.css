@@ -81,7 +81,14 @@
    of the view, so the model recedes behind copy rather than standing over it. */
 .brain-canvas {
   position: fixed;
-  inset: 0;
+  left: 0;
+  top: 0;
+  width: 100%;
+  /* Largest viewport height: mobile toolbars collapsing during scroll must not resize
+     the canvas (a WebGL resize mid-scroll is a visible hitch). The extra rows sit
+     harmlessly below the visible viewport while the toolbar is open. */
+  height: 100vh;
+  height: 100lvh;
   z-index: 0;
   pointer-events: none;
   transition: opacity 160ms linear;

@@ -751,7 +751,12 @@ export class BrainScene {
 
     // Pointer events arrive on a separate element tracking the active stage window: the
     // canvas itself is behind the whole document and must not swallow scrolls or clicks.
-    this.controls = new OrbitControls(this.camera, options.hitArea ?? this.renderer.domElement);
+    const controlSurface = options.hitArea ?? this.renderer.domElement;
+    this.controls = new OrbitControls(this.camera, controlSurface);
+    // OrbitControls sets touch-action: none on its element, which would let the stage
+    // window swallow one-finger page scrolling on touch screens. pan-y hands vertical
+    // swipes back to the page; horizontal drags still orbit.
+    controlSurface.style.touchAction = 'pan-y';
     this.controls.enableDamping = !this.reducedMotion;
     this.controls.dampingFactor = 0.065;
     this.controls.enablePan = false;
@@ -885,8 +890,12 @@ export class BrainScene {
     const rect = this.frameRect;
     if (!rect || !rect.width || !rect.height) return { position, target };
 
-    const width = window.innerWidth;
-    const height = window.innerHeight;
+    // The canvas's own size, not window.inner*: the two differ by the scrollbar on
+    // desktop and by the collapsing toolbar on mobile (the canvas holds the largest
+    // viewport height so it never resizes mid-scroll), and the NDC mapping must be in
+    // the space the camera actually renders into.
+    const width = this.container.clientWidth;
+    const height = this.container.clientHeight;
     const tanHalfFov = Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2);
 
     // Distance at which the specimen's measured extent fits the window, derived rather

@@ -8,13 +8,20 @@
       name="description"
       content="An interactive 3D companion that visualizes the Migraine Prodrome Zone and the angle-of-force migraine theory."
     />
+    <!-- Safari ignores SVG favicons and falls back to /favicon.ico, so the ICO is not
+         optional; the touch icon carries its own solid ground because iOS composites
+         transparency onto black. -->
+    <link rel="icon" href="./favicon.ico" sizes="48x48" />
     <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png" />
     <link rel="stylesheet" href="./css/style.css" />
+    <!-- Vendored (three 0.160.1): with the CDN, one unreachable host cost the page all of
+         its copy, not just the model — main.js injects the text and imports three. -->
     <script type="importmap">
       {
         "imports": {
-          "three": "https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js",
-          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/"
+          "three": "./js/vendor/three.module.min.js",
+          "three/addons/": "./js/vendor/addons/"
         }
       }
     </script>
