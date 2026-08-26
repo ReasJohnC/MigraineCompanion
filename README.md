@@ -67,6 +67,12 @@ Still open: an Amazon link for *On the Other Side of Migraine*, deferred by the 
 - No backend, no analytics, no external data. State (last selection) is `localStorage` only.
 - **One WebGL context** for the whole page: a fixed, full-bleed canvas behind the document,
   with the camera driven along a spline through per-section keyframes as you scroll.
+- **The model yields to the copy**: the canvas dims toward a 0.14-opacity floor as the
+  active stage window leaves the middle of the view, and returns as the next one arrives —
+  so the specimen never stands at full strength behind text that has scrolled past it.
+  No `backdrop-filter` anywhere: blurred surfaces over an always-animating canvas re-blur
+  every frame, and were the largest scroll cost. Render resolution is capped at DPR 1.5
+  (1.25 under 760px) — with MSAA the organic model shows no visible edge for it.
 - The panels state the model's real numbers — target, position, entry vector, entry angle,
   and the measured pineal clearance — so the author's hard constraint is something the
   reader can watch hold rather than take on trust.

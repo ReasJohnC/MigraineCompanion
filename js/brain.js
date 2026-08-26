@@ -701,6 +701,21 @@ export class BrainScene {
     this.beamAnimations = new Map();
     this.labels = [];
     this.tmpVector = new THREE.Vector3();
+    // Scratch space for the per-frame pose math, so the render loop allocates nothing.
+    this.scratch = {
+      pos: new THREE.Vector3(),
+      tar: new THREE.Vector3(),
+      dir: new THREE.Vector3(),
+      fwd: new THREE.Vector3(),
+      right: new THREE.Vector3(),
+      up: new THREE.Vector3(),
+    };
+    this.scrollPose = {
+      position: new THREE.Vector3(),
+      target: new THREE.Vector3(),
+      fov: 38,
+      fill: DEFAULT_FILL,
+    };
 
     this.scene = new THREE.Scene();
     this.scene.background = null;
@@ -712,7 +727,7 @@ export class BrainScene {
       alpha: true,
       powerPreference: 'high-performance',
     });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.04;
@@ -826,12 +841,13 @@ export class BrainScene {
     if (this.focusPose) return;
     const span = STAGE_ORDER.length - 1;
     const t = clamp(u / span, 0, 1);
-    this.rigPose = {
-      position: STAGE_POSITION_CURVE.getPoint(t),
-      target: STAGE_TARGET_CURVE.getPoint(t),
-      fov: lerpKeyframeFov(u),
-      fill: lerpKeyframeFill(u),
-    };
+    // Written into one persistent pose: this runs on every scroll frame, and fresh
+    // vectors here were steady GC pressure.
+    STAGE_POSITION_CURVE.getPoint(t, this.scrollPose.position);
+    STAGE_TARGET_CURVE.getPoint(t, this.scrollPose.target);
+    this.scrollPose.fov = lerpKeyframeFov(u);
+    this.scrollPose.fill = lerpKeyframeFill(u);
+    this.rigPose = this.scrollPose;
     if (this.reducedMotion) this.snapToRig();
   }
 
@@ -884,23 +900,28 @@ export class BrainScene {
       position.distanceTo(target),
       required * (this.rigPose?.fill ?? DEFAULT_FILL),
     );
-    const framedPosition = target
-      .clone()
-      .add(position.clone().sub(target).normalize().multiplyScalar(distance));
+
+    // All scratch vectors: this runs every frame and must not allocate. The result is
+    // only valid until the next call, which every caller consumes immediately.
+    const s = this.scratch;
+    s.dir.copy(position).sub(target).normalize();
+    s.pos.copy(target).addScaledVector(s.dir, distance);
 
     const worldHeight = 2 * distance * Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2);
     const worldWidth = worldHeight * this.camera.aspect;
     const ndcX = ((rect.left + rect.width / 2) / width) * 2 - 1;
     const ndcY = -((((rect.top + rect.height / 2) / height) * 2) - 1);
 
-    const forward = target.clone().sub(framedPosition).normalize();
-    const right = forward.clone().cross(this.camera.up).normalize();
-    const up = right.clone().cross(forward).normalize();
-    const shift = right
-      .multiplyScalar((-ndcX * worldWidth) / 2)
-      .add(up.multiplyScalar((-ndcY * worldHeight) / 2));
+    s.fwd.copy(target).sub(s.pos).normalize();
+    s.right.copy(s.fwd).cross(this.camera.up).normalize();
+    s.up.copy(s.right).cross(s.fwd).normalize();
 
-    return { position: framedPosition.add(shift), target: target.clone().add(shift) };
+    const shiftX = (-ndcX * worldWidth) / 2;
+    const shiftY = (-ndcY * worldHeight) / 2;
+    s.pos.addScaledVector(s.right, shiftX).addScaledVector(s.up, shiftY);
+    s.tar.copy(target).addScaledVector(s.right, shiftX).addScaledVector(s.up, shiftY);
+
+    return { position: s.pos, target: s.tar };
   }
 
   snapToRig() {
@@ -1349,9 +1370,10 @@ export class BrainScene {
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height, false);
-    // A full-viewport canvas costs four times the pixels at DPR 2; cap it on the small
-    // screens least able to pay for them.
-    const cap = width < 760 ? 1.5 : 2;
+    // The canvas spans the whole viewport, so DPR is the single biggest fragment cost:
+    // 1.5 is 2.25x fewer pixels than 2, and with MSAA on, the organic model shows no
+    // visible edge for it. Smaller screens get a lower cap still.
+    const cap = width < 760 ? 1.25 : 1.5;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, cap));
   }
 
@@ -1623,8 +1645,8 @@ export class BrainScene {
       const y = (-this.tmpVector.y * 0.5 + 0.5) * height;
       const visible = this.tmpVector.z < 1 && x > -40 && x < width + 40 && y > -40 && y < height + 40;
 
-      label.element.style.left = `${x}px`;
-      label.element.style.top = `${y}px`;
+      // Transform, not left/top: these move every frame and must composite, not lay out.
+      label.element.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%)`;
       label.element.style.opacity = visible ? '1' : '0';
     });
   }

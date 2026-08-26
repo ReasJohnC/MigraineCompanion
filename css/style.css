@@ -76,12 +76,16 @@
   border-top: 0;
 }
 
-/* The one WebGL context, behind everything and inert to the pointer. */
+/* The one WebGL context, behind everything and inert to the pointer. Opacity belongs to
+   the scroll rig: it dims the whole canvas as the active stage window leaves the middle
+   of the view, so the model recedes behind copy rather than standing over it. */
 .brain-canvas {
   position: fixed;
   inset: 0;
   z-index: 0;
   pointer-events: none;
+  transition: opacity 160ms linear;
+  will-change: opacity;
 }
 
 .brain-canvas canvas {
@@ -99,9 +103,12 @@ main,
   z-index: 1;
 }
 
-/* Tracks the active stage window so the model can be turned there, and only there. */
+/* Tracks the active stage window so the model can be turned there, and only there.
+   Anchored at the origin because the rig positions it with a transform. */
 .stage-hit {
   position: fixed;
+  left: 0;
+  top: 0;
   z-index: 2;
   display: none;
   cursor: grab;
@@ -191,13 +198,15 @@ a {
   white-space: nowrap;
 }
 
+/* No backdrop-filter anywhere on this page: the canvas behind it repaints every frame,
+   so each blurred surface re-blurs on every frame whether or not anything else moved —
+   it was the single largest scroll cost. Flat, slightly deeper translucency instead. */
 .site-header {
   position: sticky;
   top: 0;
   z-index: 50;
   border-bottom: 1px solid var(--line);
-  background: rgba(5, 7, 13, 0.72);
-  backdrop-filter: blur(18px);
+  background: rgba(5, 7, 13, 0.92);
 }
 
 .site-nav {
@@ -369,10 +378,10 @@ h3 {
   pointer-events: none;
   background: radial-gradient(
     ellipse 62% 58% at 34% 50%,
-    rgba(5, 7, 13, 0.95) 0%,
-    rgba(5, 7, 13, 0.88) 42%,
-    rgba(5, 7, 13, 0.55) 68%,
-    rgba(5, 7, 13, 0) 88%
+    rgba(5, 7, 13, 0.96) 0%,
+    rgba(5, 7, 13, 0.9) 46%,
+    rgba(5, 7, 13, 0.66) 70%,
+    rgba(5, 7, 13, 0) 90%
   );
 }
 
@@ -475,11 +484,12 @@ h3 {
 
 .brain-label {
   position: absolute;
+  left: 0;
+  top: 0;
   transform: translate(-50%, -50%);
   border: 1px solid rgba(65, 212, 200, 0.32);
   border-radius: var(--radius);
-  background: rgba(5, 7, 13, 0.78);
-  backdrop-filter: blur(8px);
+  background: rgba(5, 7, 13, 0.9);
   color: var(--bio);
   font-family: var(--mono);
   font-size: 0.72rem;
@@ -539,8 +549,7 @@ h3 {
   min-height: 44px;
   border: 1px solid var(--line-control);
   border-radius: 999px;
-  background: rgba(11, 18, 32, 0.55);
-  backdrop-filter: blur(8px);
+  background: rgba(11, 18, 32, 0.82);
   color: var(--text);
   cursor: pointer;
   font-size: 0.88rem;
@@ -602,8 +611,7 @@ h3 {
   border-radius: var(--radius-lg);
   background:
     radial-gradient(circle, var(--grid) 0.8px, transparent 0.9px) 0 0 / 8px 8px,
-    rgba(11, 18, 32, 0.62);
-  backdrop-filter: blur(14px);
+    rgba(11, 18, 32, 0.88);
   padding: clamp(1.25rem, 3vw, 1.75rem);
 }
 
@@ -827,8 +835,7 @@ h3 {
     border: 1px solid var(--line);
     border-radius: var(--radius);
     background: rgba(8, 12, 22, 0.97);
-    backdrop-filter: blur(18px);
-        padding: 0.35rem;
+    padding: 0.35rem;
   }
 
   .site-nav.is-open .nav-links {
@@ -935,8 +942,7 @@ h3 {
   padding: clamp(0.5rem, 2vw, 1.5rem);
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
-  background: rgba(5, 7, 13, 0.5);
-  backdrop-filter: blur(6px);
+  background: rgba(5, 7, 13, 0.78);
   overflow: hidden;
 }
 
@@ -957,8 +963,7 @@ h3 {
 .accordion-item {
   border: 1px solid var(--line-control);
   border-radius: var(--radius);
-  background: rgba(11, 18, 32, 0.5);
-  backdrop-filter: blur(10px);
+  background: rgba(11, 18, 32, 0.82);
   overflow: hidden;
 }
 
