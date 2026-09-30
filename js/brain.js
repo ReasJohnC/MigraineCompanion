@@ -51,10 +51,16 @@ const CAMERA_PRESETS = {
 // runs a spline through this list as the reader scrolls, so the whole page is one move
 // through one specimen.
 const STAGE_KEYFRAMES = {
+  // Aimed at the zone's centre, because the hero's reticle is drawn around the middle of
+  // its frame. The position only sets the viewing direction: it is inside the fit distance,
+  // so framing always pushes the camera back, and the zone's projected size stays
+  // proportional to the frame the rings were drawn for.
   hero: {
-    position: [2.06, 0.78, 2.64],
-    target: [0, 0, 0],
+    position: [0.53, 0.19, 0.77],
+    target: [-0.07, -0.04, 0],
     fov: 34,
+    // Air above and below the specimen for the reticle's title and caption.
+    fill: 1.16,
   },
   'prodrome-zone': {
     position: [1.97, 1.04, 2.41],
@@ -79,7 +85,7 @@ const STAGE_KEYFRAMES = {
     position: [0.68, 0.55, 1.15],
     target: [-0.26, 0.04, 0],
     fov: 28,
-    fill: 0.4,
+    fill: 0.8,
   },
   // Looking down the axis that opens the fan widest. Measured over every pair of beams,
   // the tightest apparent separation is 33.0° from here against 0.9° from the old 3/4
@@ -116,11 +122,19 @@ function lerpKeyframeFov(u) {
   return a + (b - a) * clamp(u - lower, 0, 1);
 }
 
-// The specimen's measured extent (bbox x -1.13..1.19, y -0.59..0.84), and how much of the
-// window it is allowed to fill. Above 1 it bleeds past the window's edges, which reads as
-// intentional; the pineal close-up deliberately goes much closer.
-const MODEL_EXTENT = { x: 2.35, y: 1.45 };
-const DEFAULT_FILL = 0.86;
+// How far back the camera stands relative to the tightest distance at which the whole
+// specimen fits its window (see fitDistance): 1 touches the window's edges, above 1 leaves
+// air around it, below 1 crops it.
+const DEFAULT_FILL = 1.04;
+
+// Never closer than this to the target, whatever the window: the cortex is about 1 unit
+// out from the centre, and the camera must stay outside it.
+const MIN_CAMERA_DISTANCE = 1.6;
+
+// The fog's range either side of the target, tuned when the camera always stood about 3.4
+// units back (fog 2.2–6.4): the near half of the specimen is clear, the far half recedes.
+const FOG_NEAR = 1.25;
+const FOG_FAR = 3;
 
 function lerpKeyframeFill(u) {
   const lower = Math.max(0, Math.min(STAGE_ORDER.length - 1, Math.floor(u)));
@@ -132,6 +146,10 @@ function lerpKeyframeFill(u) {
 
 // How long the rig stays out of the way after the reader stops turning the model.
 const USER_CONTROL_HOLD = 2600;
+
+// The idle sway: ±8°, once every half minute.
+const SWAY_AMPLITUDE = 0.14;
+const SWAY_PERIOD = 30;
 
 // An ellipsoid fitted inside the displaced cerebrum's measured bounds (x -1.13..1.19,
 // y -0.59..0.84, z -0.64..0.68), so any point on it is under the cortical surface rather
@@ -695,6 +713,7 @@ export class BrainScene {
     this.rigPose = null;
     this.focusPose = null;
     this.delta = 0.016;
+    this.swayClock = 0;
     this.sequenceToken = 0;
     this.markers = new Map();
     this.beams = new Map();
@@ -709,6 +728,10 @@ export class BrainScene {
       fwd: new THREE.Vector3(),
       right: new THREE.Vector3(),
       up: new THREE.Vector3(),
+      fitFwd: new THREE.Vector3(),
+      fitRight: new THREE.Vector3(),
+      fitUp: new THREE.Vector3(),
+      fitPoint: new THREE.Vector3(),
     };
     this.scrollPose = {
       position: new THREE.Vector3(),
@@ -886,6 +909,67 @@ export class BrainScene {
     this.frameRect = rect;
   }
 
+  // The support points: for each of 26 directions, the tissue point furthest along it, in
+  // the root's frame. Extremes of the real meshes rather than a bounding box, so the fit
+  // below is tight from any angle — a box's corners stand well proud of a brain — and it
+  // includes the brainstem, which the old fixed extent left out.
+  measureSupport(meshes) {
+    const directions = [];
+    for (let x = -1; x <= 1; x += 1) {
+      for (let y = -1; y <= 1; y += 1) {
+        for (let z = -1; z <= 1; z += 1) {
+          if (x || y || z) directions.push(new THREE.Vector3(x, y, z).normalize());
+        }
+      }
+    }
+    const best = directions.map(() => ({ reach: -Infinity, point: new THREE.Vector3() }));
+    const vertex = new THREE.Vector3();
+
+    meshes.forEach(({ mesh, margin }) => {
+      mesh.updateMatrix();
+      const position = mesh.geometry.attributes.position;
+      for (let i = 0; i < position.count; i += 2) {
+        vertex.fromBufferAttribute(position, i).applyMatrix4(mesh.matrix);
+        for (let k = 0; k < directions.length; k += 1) {
+          const reach = vertex.dot(directions[k]) + margin;
+          if (reach > best[k].reach) {
+            best[k].reach = reach;
+            best[k].point.copy(vertex).addScaledVector(directions[k], margin);
+          }
+        }
+      }
+    });
+
+    this.supportPoints = best.map((entry) => entry.point);
+  }
+
+  // The nearest the camera can stand, looking along `dir` at `target`, with every support
+  // point inside `rect`. A point at lateral offset x and depth z past the target projects
+  // inside the window while x / (d + z) ≤ tan(half-angle), so d ≥ x / tan − z. The
+  // specimen's current pose is used, so the fit holds through the sway.
+  fitDistance(target, dir, rect, viewportHeight) {
+    const s = this.scratch;
+    const tanHalf = Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2);
+    const tanV = (rect.height / viewportHeight) * tanHalf;
+    const tanH = (rect.width / viewportHeight) * tanHalf;
+    s.fitFwd.copy(dir).negate();
+    s.fitRight.copy(s.fitFwd).cross(this.camera.up).normalize();
+    s.fitUp.copy(s.fitRight).cross(s.fitFwd).normalize();
+    this.root.updateMatrix();
+
+    let distance = 0;
+    for (const point of this.supportPoints) {
+      s.fitPoint.copy(point).applyMatrix4(this.root.matrix).sub(target);
+      const depth = s.fitPoint.dot(s.fitFwd);
+      distance = Math.max(
+        distance,
+        Math.abs(s.fitPoint.dot(s.fitRight)) / tanH - depth,
+        Math.abs(s.fitPoint.dot(s.fitUp)) / tanV - depth,
+      );
+    }
+    return distance;
+  }
+
   framedPose(position, target) {
     const rect = this.frameRect;
     if (!rect || !rect.width || !rect.height) return { position, target };
@@ -896,24 +980,18 @@ export class BrainScene {
     // the space the camera actually renders into.
     const width = this.container.clientWidth;
     const height = this.container.clientHeight;
-    const tanHalfFov = Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2);
-
-    // Distance at which the specimen's measured extent fits the window, derived rather
-    // than guessed: scaling by viewport height alone ignored the horizontal, so on a
-    // portrait phone the model was cropped by a third. The keyframe chooses the angle;
-    // this chooses how far back to stand, at any viewport shape.
-    const required =
-      (height / (2 * tanHalfFov)) *
-      Math.max(MODEL_EXTENT.y / rect.height, MODEL_EXTENT.x / rect.width);
-    const distance = Math.max(
-      position.distanceTo(target),
-      required * (this.rigPose?.fill ?? DEFAULT_FILL),
-    );
 
     // All scratch vectors: this runs every frame and must not allocate. The result is
     // only valid until the next call, which every caller consumes immediately.
     const s = this.scratch;
     s.dir.copy(position).sub(target).normalize();
+
+    // The keyframe chooses the angle; the fit chooses how far back to stand, so the whole
+    // specimen lands in its window at any viewport shape.
+    const distance = Math.max(
+      MIN_CAMERA_DISTANCE,
+      this.fitDistance(target, s.dir, rect, height) * (this.rigPose?.fill ?? DEFAULT_FILL),
+    );
     s.pos.copy(target).addScaledVector(s.dir, distance);
 
     const worldHeight = 2 * distance * Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2);
@@ -944,11 +1022,15 @@ export class BrainScene {
     this.controls.update();
   }
 
-  // A very slow turn so the specimen reads as live rather than parked. It stops the
-  // moment the reader takes hold of it and only resumes once they have let go.
+  // A slow sway so the specimen reads as live rather than parked. It was a continuous
+  // turn, which left every section's composition to chance: how long the reader lingered
+  // decided whether the capstone fan arrived face-on or edge-on. A sway stays near each
+  // keyframe's intended view. Its clock only runs while it is visible and nobody is
+  // holding the model, so it resumes without a jump.
   updateIdleSpin(now) {
     if (this.reducedMotion || now < this.userControlUntil) return;
-    this.root.rotation.y += 0.02 * this.delta;
+    this.swayClock += this.delta;
+    this.root.rotation.y = SWAY_AMPLITUDE * Math.sin((this.swayClock * 2 * Math.PI) / SWAY_PERIOD);
   }
 
   updateRig(now) {
@@ -960,6 +1042,15 @@ export class BrainScene {
     this.controls.target.lerp(target, ease);
     this.camera.fov += (this.rigPose.fov - this.camera.fov) * ease;
     this.camera.updateProjectionMatrix();
+  }
+
+  // Fog grades depth across the specimen, so its range travels with the camera. At a
+  // fixed range, a small window — which the fit answers by standing further back — fogged
+  // everything but the cortex's rim light away.
+  updateFog() {
+    const distance = this.camera.position.distanceTo(this.controls.target);
+    this.scene.fog.near = distance - FOG_NEAR;
+    this.scene.fog.far = distance + FOG_FAR;
   }
 
   createLights() {
@@ -1008,6 +1099,18 @@ export class BrainScene {
     brainstem.rotation.z = -0.08;
     brainstem.renderOrder = 1;
     this.root.add(brainstem);
+
+    // The tissue is what framing fits and what the verify harness measures. The cortex
+    // gets the relief's full outward throw as margin, since that displacement happens on
+    // the GPU and is not in the geometry.
+    [cerebrum, cerebellum, brainstem].forEach((mesh) => {
+      mesh.userData.tissue = true;
+    });
+    this.measureSupport([
+      { mesh: cerebrum, margin: 0.07 },
+      { mesh: cerebellum, margin: 0 },
+      { mesh: brainstem, margin: 0 },
+    ]);
 
     // The longitudinal fissure is cut into the cortical displacement field (see the
     // `fissure` term in createCerebrumGeometry) rather than drawn as an object on top.
@@ -1675,6 +1778,7 @@ export class BrainScene {
     this.updateIdleSpin(now);
     this.updateRig(now);
     this.controls?.update();
+    this.updateFog();
     this.updateLabels();
     this.renderer.render(this.scene, this.camera);
     this.frame = requestAnimationFrame(this.render);

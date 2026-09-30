@@ -57,11 +57,13 @@ function createScrollRig(scene, hitArea, onStageChange) {
     }
 
     // The pointer surface tracks the active window so orbiting works there and nowhere
-    // else; the canvas itself must not swallow scrolls over the copy.
+    // else; the canvas itself must not swallow scrolls over the copy. The hero's figure
+    // frames the model but is not a stage: turning the model there would pull the zone
+    // out from under the reticle drawn on it.
     const target = nearest.window?.getBoundingClientRect();
     if (target && target.height) {
       scene.setFrameRect(target);
-      hitArea.style.display = 'block';
+      hitArea.style.display = nearest.window.classList.contains('stage-window') ? 'block' : 'none';
       // Position with a transform so the per-scroll write composites instead of laying
       // out; the size genuinely changes only across sections.
       hitArea.style.transform = `translate(${target.left}px, ${target.top}px)`;
@@ -126,7 +128,13 @@ function bootstrap() {
   window.__scenes = scenes;
 
   const ui = initUI({ scenes, motionQuery });
-  if (scene) window.__rig = createScrollRig(scene, hitArea, ui.onStageChange);
+  if (scene) {
+    window.__rig = createScrollRig(scene, hitArea, ui.onStageChange);
+    // The scene was built before any stage window was known, so its first pose is the raw
+    // keyframe. Start from the framed pose instead of easing out to it on the first frames
+    // — for the hero that raw pose is inside the cortex.
+    scene.snapToRig();
+  }
 }
 
 if (document.readyState === 'loading') {

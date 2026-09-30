@@ -364,9 +364,9 @@ main > section {
   display: flex;
   align-items: center;
   padding: clamp(4.5rem, 8vw, 8rem) 0 clamp(2.5rem, 6vw, 5rem);
-  background:
-    radial-gradient(120% 90% at 84% 10%, rgba(47, 125, 138, 0.12), transparent 60%),
-    radial-gradient(90% 85% at 2% 96%, rgba(255, 122, 69, 0.11), transparent 55%);
+  /* A cool pool of light behind the figure. The warm corner glow this replaced was tied
+     to nothing on the page, and warm is the force's colour. */
+  background: radial-gradient(55% 65% at 72% 52%, rgba(47, 125, 138, 0.1), transparent 70%);
 }
 
 /* Equal halves: the headline's size is derived from this column's width (see h1). */
@@ -1069,19 +1069,22 @@ h3 {
   max-width: 52ch;
 }
 
-.bullseye-frame {
+/* The hero's stage. It was a dark box laid across the specimen; now the specimen is framed
+   into it and the reticle sits on top, transparent, so the two read as one figure. The
+   aspect ratio is fixed because the rings are drawn to the zone's projected size, which
+   scales with the frame. */
+.hero-figure {
+  position: relative;
   margin: 0;
-  padding: clamp(0.5rem, 2vw, 1.5rem);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  background: rgba(5, 7, 13, 0.78);
-  overflow: hidden;
+  aspect-ratio: 5 / 4;
 }
 
-.bullseye-frame img {
-  display: block;
+.hero-figure img {
+  position: absolute;
+  inset: 0;
   width: 100%;
-  height: auto;
+  height: 100%;
+  pointer-events: none;
 }
 
 /* ---------- Simulator: accordion ---------- */

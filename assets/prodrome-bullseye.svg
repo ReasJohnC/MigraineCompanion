@@ -1,6 +1,6 @@
 <svg
   xmlns="http://www.w3.org/2000/svg"
-  viewBox="0 0 640 380"
+  viewBox="0 0 640 512"
   role="img"
   aria-labelledby="bullseye-title bullseye-desc"
   font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
@@ -11,43 +11,55 @@
     marking the deep-brain region of the theory: the thalamus, hypothalamus, and pineal body.
   </desc>
 
+  <!-- Laid over the live model in the hero. The frame is 5:4 like this viewBox, and the
+       camera aims at the zone's centre, so the rings are centred on the canvas; the outer
+       ring is drawn just outside the zone's projected half-height (about 82 units at every
+       viewport). The text sits on a halo of the page ground so it reads over the specimen. -->
   <text
     x="320"
-    y="52"
+    y="22"
     text-anchor="middle"
     fill="#41d4c8"
     font-size="15"
     letter-spacing="0.18em"
+    stroke="#05070d"
+    stroke-width="6"
+    stroke-linejoin="round"
+    paint-order="stroke"
   >PRODROME ZONE</text>
 
   <!-- Rings and ticks are the instrument; only the centre carries the theory's colour. -->
-  <g transform="translate(320 205)" fill="none" stroke="#41d4c8" stroke-opacity="0.28" stroke-width="1">
-    <circle r="120" />
-    <circle r="94" stroke-opacity="0.2" />
-    <circle r="66" stroke-opacity="0.2" />
-    <circle r="38" stroke-opacity="0.2" />
+  <g transform="translate(320 256)" fill="none" stroke="#41d4c8" stroke-width="1">
+    <circle r="92" stroke-opacity="0.45" />
+    <circle r="70" stroke-opacity="0.22" />
+    <circle r="48" stroke-opacity="0.22" />
+    <circle r="26" stroke-opacity="0.22" />
   </g>
 
-  <!-- Ticks straddle the outer ring; they must clear the title above and the caption below. -->
-  <g stroke="#41d4c8" stroke-opacity="0.45" stroke-width="1" stroke-linecap="round">
-    <line x1="320" y1="75" x2="320" y2="95" />
-    <line x1="320" y1="315" x2="320" y2="335" />
-    <line x1="190" y1="205" x2="210" y2="205" />
-    <line x1="430" y1="205" x2="450" y2="205" />
+  <!-- Ticks straddle the outer ring on the four axes. -->
+  <g stroke="#41d4c8" stroke-opacity="0.65" stroke-width="1.25" stroke-linecap="round">
+    <line x1="320" y1="152" x2="320" y2="176" />
+    <line x1="320" y1="336" x2="320" y2="360" />
+    <line x1="216" y1="256" x2="240" y2="256" />
+    <line x1="400" y1="256" x2="424" y2="256" />
   </g>
 
-  <g transform="translate(320 205)">
-    <circle r="26" fill="#ff7a45" opacity="0.12" />
-    <circle r="13" fill="#ff7a45" opacity="0.35" />
-    <circle r="6" fill="#ffd9a8" />
+  <g transform="translate(320 256)">
+    <circle r="16" fill="#ff7a45" opacity="0.16" />
+    <circle r="8" fill="#ff7a45" opacity="0.38" />
+    <circle r="3.5" fill="#ffd9a8" />
   </g>
 
   <text
     x="320"
-    y="360"
+    y="500"
     text-anchor="middle"
     fill="#9db3bf"
     font-size="12.5"
     letter-spacing="0.1em"
+    stroke="#05070d"
+    stroke-width="5"
+    stroke-linejoin="round"
+    paint-order="stroke"
   >thalamus · hypothalamus · pineal body</text>
 </svg>
