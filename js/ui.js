@@ -110,7 +110,25 @@ function buildChipGroup(list, items, { single, label, onSelect }) {
     button.dataset.symptomId = item.id;
     button.setAttribute(stateAttribute, 'false');
     button.setAttribute('tabindex', index === 0 ? '0' : '-1');
-    button.textContent = item.label;
+    if (item.sublabel) {
+      // Two lines, symptom over structure. The separator stays in the text, hidden, so
+      // the name read aloud is unchanged: "Mood Alterations — Lateral tuberal nucleus".
+      const text = document.createElement('span');
+      text.className = 'chip-text';
+      const main = document.createElement('span');
+      main.className = 'chip-label';
+      main.textContent = item.label;
+      const sub = document.createElement('span');
+      sub.className = 'chip-sub';
+      const separator = document.createElement('span');
+      separator.className = 'visually-hidden';
+      separator.textContent = ' — ';
+      sub.append(separator, item.sublabel);
+      text.append(main, sub);
+      button.appendChild(text);
+    } else {
+      button.textContent = item.label;
+    }
     button.addEventListener('click', () => onSelect(item.id));
     button.addEventListener('keydown', (event) => {
       const last = buttons.length - 1;
@@ -142,6 +160,24 @@ function buildChipGroup(list, items, { single, label, onSelect }) {
       buttons.forEach((button, index) => button.setAttribute('tabindex', index === stop ? '0' : '-1'));
     },
   };
+}
+
+// Below the two-column breakpoint the stage sits above the controls, so a choice made
+// further down could play entirely off-screen. This brings back just enough of the stage to
+// watch the force — never more, so the control the reader just used stays within reach.
+// With the stage sticky beside the controls it is already in view and nothing moves.
+function keepStageInView(stage, motionQuery) {
+  const rect = stage?.getBoundingClientRect();
+  if (!rect?.height) return;
+  const top = document.querySelector('.site-header')?.getBoundingClientRect().bottom ?? 0;
+  const visible = Math.min(rect.bottom, window.innerHeight) - Math.max(rect.top, top);
+  const wanted = rect.height * 0.7;
+  if (visible >= wanted) return;
+  const shortfall = wanted - visible;
+  window.scrollBy({
+    top: rect.top < top ? -shortfall : shortfall,
+    behavior: motionQuery?.matches ? 'auto' : 'smooth',
+  });
 }
 
 function safeRead() {
@@ -354,7 +390,8 @@ function buildSymptomBlock(container, mode, onSingle, onCombination) {
   return { chips, boxes, group };
 }
 
-function initSimulator(scene) {
+function initSimulator(scene, motionQuery) {
+  const stage = document.querySelector('[data-brain="simulator"]');
   const readoutList = document.querySelector('[data-readout]');
   const detail = document.querySelector('[data-sim-detail]');
   const hud = document.querySelector('[data-sim-hud]');
@@ -458,6 +495,7 @@ function initSimulator(scene) {
     });
     block.group.setSelected([id]);
     fire([id]);
+    keepStageInView(stage, motionQuery);
   };
 
   const selectCombination = (mode) => {
@@ -465,6 +503,7 @@ function initSimulator(scene) {
     if (!block) return;
     block.group.setSelected([]);
     fire(currentSelection(mode));
+    keepStageInView(stage, motionQuery);
   };
 
   document.querySelectorAll('[data-symptom-block]').forEach((container) => {
@@ -554,7 +593,8 @@ function initSimulator(scene) {
   return reapply;
 }
 
-function initReference(scene) {
+function initReference(scene, motionQuery) {
+  const stage = document.querySelector('[data-brain="structures"]');
   const list = document.querySelector('[data-reference-list]');
   const name = document.querySelector('[data-reference-name]');
   const detail = document.querySelector('[data-reference-detail]');
@@ -599,9 +639,17 @@ function initReference(scene) {
     list,
     BEAM_DEFS.map((symptom) => ({
       id: symptom.id,
-      label: `${symptom.label} — ${getStructure(symptom.structureId)?.name ?? ''}`,
+      label: symptom.label,
+      sublabel: getStructure(symptom.structureId)?.name ?? '',
     })),
-    { single: true, label: 'Prodrome Zone structures', onSelect: select },
+    {
+      single: true,
+      label: 'Prodrome Zone structures',
+      onSelect: (id) => {
+        select(id);
+        keepStageInView(stage, motionQuery);
+      },
+    },
   );
 
   select(BEAM_DEFS[0].id, { instant: true });
@@ -721,8 +769,8 @@ export function initUI({ scenes, motionQuery }) {
   initCopy();
   initNavigation();
   initReveals(motionQuery);
-  const restateSimulator = initSimulator(scenes.simulator);
-  const restateStructures = initReference(scenes.structures);
+  const restateSimulator = initSimulator(scenes.simulator, motionQuery);
+  const restateStructures = initReference(scenes.structures, motionQuery);
   const restateAngles = initAnglesModule(scenes.angles, motionQuery);
   initReducedMotionListener([scenes.overview], motionQuery);
 

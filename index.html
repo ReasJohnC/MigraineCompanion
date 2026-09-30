@@ -118,46 +118,62 @@
             </p>
           </div>
 
-          <div class="accordion" data-accordion>
-            <div class="accordion-item">
-              <h3 class="accordion-heading">
-                <button
-                  class="accordion-trigger"
-                  type="button"
-                  data-accordion-trigger="no-aura"
-                  aria-expanded="false"
-                  aria-controls="panel-no-aura"
-                >
-                  <span class="accordion-label">Migraine without Aura</span>
-                  <span class="accordion-icon" aria-hidden="true"></span>
-                </button>
-              </h3>
-              <div class="accordion-panel" id="panel-no-aura" data-accordion-panel="no-aura" hidden>
-                <div class="symptom-block" data-symptom-block="no-aura"></div>
-              </div>
-            </div>
-
-            <div class="accordion-item">
-              <h3 class="accordion-heading">
-                <button
-                  class="accordion-trigger"
-                  type="button"
-                  data-accordion-trigger="aura"
-                  aria-expanded="false"
-                  aria-controls="panel-aura"
-                >
-                  <span class="accordion-label">Migraine with Aura</span>
-                  <span class="accordion-icon" aria-hidden="true"></span>
-                </button>
-              </h3>
-              <div class="accordion-panel" id="panel-aura" data-accordion-panel="aura" hidden>
-                <p class="aura-note">* Specifically, the visual aura (scintillating scotoma type)</p>
-                <div class="symptom-block" data-symptom-block="aura"></div>
-              </div>
-            </div>
-          </div>
-
+          <!-- Controls and their readout on the left, the model on the right and sticky, so
+               the force plays where the reader is looking when they choose a symptom. -->
           <div class="interactive-layout">
+            <div class="control-column">
+              <div class="accordion" data-accordion>
+                <div class="accordion-item">
+                  <h3 class="accordion-heading">
+                    <button
+                      class="accordion-trigger"
+                      type="button"
+                      data-accordion-trigger="no-aura"
+                      aria-expanded="false"
+                      aria-controls="panel-no-aura"
+                    >
+                      <span class="accordion-label">Migraine without Aura</span>
+                      <span class="accordion-icon" aria-hidden="true"></span>
+                    </button>
+                  </h3>
+                  <div class="accordion-panel" id="panel-no-aura" data-accordion-panel="no-aura" hidden>
+                    <div class="symptom-block" data-symptom-block="no-aura"></div>
+                  </div>
+                </div>
+
+                <div class="accordion-item">
+                  <h3 class="accordion-heading">
+                    <button
+                      class="accordion-trigger"
+                      type="button"
+                      data-accordion-trigger="aura"
+                      aria-expanded="false"
+                      aria-controls="panel-aura"
+                    >
+                      <span class="accordion-label">Migraine with Aura</span>
+                      <span class="accordion-icon" aria-hidden="true"></span>
+                    </button>
+                  </h3>
+                  <div class="accordion-panel" id="panel-aura" data-accordion-panel="aura" hidden>
+                    <p class="aura-note">* Specifically, the visual aura (scintillating scotoma type)</p>
+                    <div class="symptom-block" data-symptom-block="aura"></div>
+                  </div>
+                </div>
+              </div>
+
+              <aside class="detail-panel" aria-labelledby="sim-heading">
+                <p class="panel-hook" id="sim-heading">No symptom selected</p>
+                <div class="readout-list" data-readout aria-live="polite">
+                  <p class="readout-empty">
+                    Open a section above and choose a symptom. The force enters at that symptom’s
+                    angle, and the structure it strikes is named as the force arrives.
+                  </p>
+                </div>
+                <div class="panel-detail" data-sim-detail></div>
+                <div class="hud" data-sim-hud aria-label="Measurements for the selected symptom"></div>
+              </aside>
+            </div>
+
             <div class="module-column">
               <div
                 class="stage-window"
@@ -168,18 +184,6 @@
                 aria-label="Rotatable 3D anatomical brain model. A fixed line runs through the selected structure while a cursor travels along it."
               ></div>
             </div>
-
-            <aside class="detail-panel" aria-labelledby="sim-heading">
-              <p class="panel-hook" id="sim-heading">No symptom selected</p>
-              <div class="readout-list" data-readout aria-live="polite">
-                <p class="readout-empty">
-                  Open a section above and choose a symptom. The force enters at that symptom’s
-                  angle, and the structure it strikes is named as the force arrives.
-                </p>
-              </div>
-              <div class="panel-detail" data-sim-detail></div>
-              <div class="hud" data-sim-hud aria-label="Measurements for the selected symptom"></div>
-            </aside>
           </div>
         </div>
       </section>
@@ -194,9 +198,30 @@
             </p>
           </div>
 
-          <div class="chip-list" data-reference-list role="group" aria-label="Prodrome Zone structures"></div>
-
           <div class="interactive-layout">
+            <div class="control-column">
+              <div class="chip-list option-list" data-reference-list role="group" aria-label="Prodrome Zone structures"></div>
+
+              <aside class="detail-panel reference-panel">
+                <h3 id="reference-name" data-reference-name>Mood Alterations / Lateral tuberal nucleus</h3>
+                <p id="reference-detail" data-reference-detail></p>
+
+                <div class="hud" data-reference-hud aria-label="Measurements for the selected structure"></div>
+
+                <div class="zoom-callout" id="reference-callout">
+                  <div class="nucleus-zoom" aria-hidden="true">
+                    <span class="nucleus-dot"></span>
+                    <span class="nucleus-beam"></span>
+                  </div>
+                  <div>
+                    <p class="callout-label" data-callout-label>Inside the nucleus</p>
+                    <p data-callout-caption>The angle of force through this structure.</p>
+                    <p class="callout-angle" data-callout-angle></p>
+                  </div>
+                </div>
+              </aside>
+            </div>
+
             <div class="module-column">
               <div
                 class="stage-window"
@@ -207,25 +232,6 @@
                 aria-label="Rotatable 3D anatomical brain model showing the selected structure and the angle of force that reaches it."
               ></div>
             </div>
-
-            <aside class="detail-panel reference-panel">
-              <h3 id="reference-name" data-reference-name>Mood Alterations / Lateral tuberal nucleus</h3>
-              <p id="reference-detail" data-reference-detail></p>
-
-              <div class="hud" data-reference-hud aria-label="Measurements for the selected structure"></div>
-
-              <div class="zoom-callout" id="reference-callout">
-                <div class="nucleus-zoom" aria-hidden="true">
-                  <span class="nucleus-dot"></span>
-                  <span class="nucleus-beam"></span>
-                </div>
-                <div>
-                  <p class="callout-label" data-callout-label>Inside the nucleus</p>
-                  <p data-callout-caption>The angle of force through this structure.</p>
-                  <p class="callout-angle" data-callout-angle></p>
-                </div>
-              </div>
-            </aside>
           </div>
         </div>
       </section>
