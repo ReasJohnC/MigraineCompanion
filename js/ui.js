@@ -390,7 +390,7 @@ function buildSymptomBlock(container, mode, onSingle, onCombination) {
   return { chips, boxes, group };
 }
 
-function initSimulator(scene, motionQuery) {
+function initSimulator(getScene, motionQuery) {
   const stage = document.querySelector('[data-brain="simulator"]');
   const readoutList = document.querySelector('[data-readout]');
   const detail = document.querySelector('[data-sim-detail]');
@@ -460,7 +460,7 @@ function initSimulator(scene, motionQuery) {
     const block = blocks.get(openMode);
     if (!ids.length) {
       clearReadout('Choose a symptom to follow the force through the brain.');
-      scene?.clearActive();
+      getScene()?.clearActive();
       return;
     }
 
@@ -470,6 +470,8 @@ function initSimulator(scene, motionQuery) {
     clearReadout(instant ? '' : 'The force enters the brain…');
     setDetail(beamIds);
 
+    // Without the model (still loading, or unable to start) the readout still answers.
+    const scene = getScene();
     if (!scene) {
       beamIds.forEach(appendReadout);
       return;
@@ -531,7 +533,7 @@ function initSimulator(scene, motionQuery) {
     });
 
     if (!mode) {
-      scene?.clearActive();
+      getScene()?.clearActive();
       if (hook) hook.textContent = 'No symptom selected';
       clearReadout('Open a section above and choose a symptom.');
       return;
@@ -547,7 +549,7 @@ function initSimulator(scene, motionQuery) {
     block?.boxes.forEach((box) => {
       box.checked = false;
     });
-    scene?.clearActive();
+    getScene()?.clearActive();
     clearReadout('Choose a symptom to follow the force through the brain.');
   };
 
@@ -564,12 +566,12 @@ function initSimulator(scene, motionQuery) {
   // rather than leaving the previous section's beams on screen.
   const reapply = () => {
     if (!openMode) {
-      scene?.clearActive();
+      getScene()?.clearActive();
       return;
     }
     const ids = currentSelection(openMode);
     if (ids.length) fire(ids, { instant: true });
-    else scene?.clearActive();
+    else getScene()?.clearActive();
   };
 
   const stored = safeRead();
@@ -593,7 +595,7 @@ function initSimulator(scene, motionQuery) {
   return reapply;
 }
 
-function initReference(scene, motionQuery) {
+function initReference(getScene, motionQuery) {
   const stage = document.querySelector('[data-brain="structures"]');
   const list = document.querySelector('[data-reference-list]');
   const name = document.querySelector('[data-reference-name]');
@@ -614,7 +616,7 @@ function initReference(scene, motionQuery) {
 
     // The chip already names the structure, so the panel updates at once here and
     // the line runs alongside it rather than gating the text.
-    scene?.revealSymptoms([id], { instant: Boolean(options.instant) });
+    getScene()?.revealSymptoms([id], { instant: Boolean(options.instant) });
 
     const { angle, elevation } = calloutGeometry(symptom.beamDir);
 
@@ -663,11 +665,10 @@ function initReference(scene, motionQuery) {
 const SEQUENCE_COMPLETE =
   'Every angle has struck. The pineal is reached from its own upper-posterior direction.';
 
-function initAnglesModule(anglesScene, motionQuery) {
+function initAnglesModule(getScene, motionQuery) {
   const playButton = document.querySelector('[data-play-sequence]');
   const showAllButton = document.querySelector('[data-show-all]');
   const status = document.querySelector('[data-sequence-status]');
-  if (!anglesScene) return;
 
   let playing = false;
   let step = 0;
@@ -688,7 +689,7 @@ function initAnglesModule(anglesScene, motionQuery) {
     playButton.dataset.playing = 'false';
   };
 
-  const stepOnce = () => {
+  const stepOnce = (anglesScene) => {
     const id = BEAM_SEQUENCE[step];
     shown = { kind: 'single', id };
     anglesScene.showSingleAngle(id);
@@ -700,7 +701,7 @@ function initAnglesModule(anglesScene, motionQuery) {
     }
   };
 
-  const play = async () => {
+  const play = async (anglesScene) => {
     playing = true;
     if (playButton) {
       playButton.textContent = 'Stop';
@@ -713,9 +714,12 @@ function initAnglesModule(anglesScene, motionQuery) {
     resetLabel();
   };
 
+  // Both actions drive the model and nothing else, so they wait for it.
   playButton?.addEventListener('click', () => {
+    const anglesScene = getScene();
+    if (!anglesScene) return;
     if (stepped()) {
-      stepOnce();
+      stepOnce(anglesScene);
       return;
     }
     if (playing) {
@@ -723,10 +727,12 @@ function initAnglesModule(anglesScene, motionQuery) {
       setStatus('Stopped.');
       return;
     }
-    play();
+    play(anglesScene);
   });
 
   showAllButton?.addEventListener('click', () => {
+    const anglesScene = getScene();
+    if (!anglesScene) return;
     if (playing) anglesScene.cancelSequence();
     step = 0;
     shown = { kind: 'all' };
@@ -745,15 +751,16 @@ function initAnglesModule(anglesScene, motionQuery) {
   // Scrolling away hands the model to another section; coming back restores whatever
   // this one was last showing rather than silently emptying it.
   return () => {
-    if (playing) return;
+    const anglesScene = getScene();
+    if (playing || !anglesScene) return;
     if (shown?.kind === 'all') anglesScene.showAllBeams();
     else if (shown?.kind === 'single') anglesScene.showSingleAngle(shown.id);
   };
 }
 
-function initReducedMotionListener(scenes, motionQuery) {
+function initReducedMotionListener(getScene, motionQuery) {
   const apply = () => {
-    scenes.forEach((scene) => scene?.setReducedMotion(motionQuery.matches));
+    getScene()?.setReducedMotion(motionQuery.matches);
   };
 
   apply();
@@ -765,14 +772,14 @@ function initReducedMotionListener(scenes, motionQuery) {
   }
 }
 
-export function initUI({ scenes, motionQuery }) {
+export function initUI({ getScene, motionQuery }) {
   initCopy();
   initNavigation();
   initReveals(motionQuery);
-  const restateSimulator = initSimulator(scenes.simulator, motionQuery);
-  const restateStructures = initReference(scenes.structures, motionQuery);
-  const restateAngles = initAnglesModule(scenes.angles, motionQuery);
-  initReducedMotionListener([scenes.overview], motionQuery);
+  const restateSimulator = initSimulator(getScene, motionQuery);
+  const restateStructures = initReference(getScene, motionQuery);
+  const restateAngles = initAnglesModule(getScene, motionQuery);
+  initReducedMotionListener(getScene, motionQuery);
 
   // One scene serves every section, so the section the reader has scrolled to restates
   // itself as the model is handed over.

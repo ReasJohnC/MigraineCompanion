@@ -1,5 +1,13 @@
-import { BrainScene, STAGE_ORDER } from './brain.js';
 import { initUI } from './ui.js';
+
+// Only the page's own modules load statically. The 3-D module and three.js (670 KB) arrive
+// by dynamic import below: when they were part of this graph, every word on the page waited
+// for them, so a slow connection saw a blank page. They are deliberately not preloaded —
+// measured at 90 KB/s, a preload's share of the bandwidth held the headline back from 1.3 s
+// to 3.5 s and brought the model forward by only half a second.
+
+const STAGE_LOADING = 'Loading brain model…';
+const STAGE_FAILED = 'The 3D schematic could not be initialized in this browser.';
 
 // Drives the one scene from the scroll position: which section owns the model, where on
 // screen it should be framed, and how far between two keyframes the camera has travelled.
@@ -11,8 +19,8 @@ const FADE_START = 0.2;
 const FADE_END = 0.75;
 const FADE_FLOOR = 0.14;
 
-function createScrollRig(scene, hitArea, onStageChange) {
-  const windows = STAGE_ORDER.map((id) => ({
+function createScrollRig(scene, stageOrder, hitArea, onStageChange) {
+  const windows = stageOrder.map((id) => ({
     id,
     section: document.getElementById(id),
     window: document.querySelector(`[data-brain][data-stage="${id}"]`),
@@ -95,16 +103,32 @@ function createScrollRig(scene, hitArea, onStageChange) {
   return { update: schedule, sync: update };
 }
 
-function showSceneFallback() {
-  const container = document.getElementById('brain-canvas');
-  const loading = container?.querySelector('.brain-loading');
-  if (loading) {
-    loading.textContent = 'The 3D schematic could not be initialized in this browser.';
-  }
-  document.body.classList.add('no-webgl');
+// Each stage says what the model is doing — loading, or unable to start — inside the stage
+// itself. The fallback used to be one sentence fixed in the middle of the viewport, where
+// it floated over every section in turn.
+function setStageStatus(text) {
+  document.querySelectorAll('.stage-window').forEach((stage) => {
+    let status = stage.querySelector('.stage-status');
+    if (!status) {
+      status = document.createElement('p');
+      status.className = 'stage-status';
+      stage.appendChild(status);
+    }
+    status.textContent = text;
+  });
 }
 
-function bootstrap() {
+function showSceneFallback() {
+  document.body.classList.remove('scene-loading');
+  document.body.classList.add('no-webgl');
+  setStageStatus(STAGE_FAILED);
+  // These two drive the model and nothing else.
+  document.querySelectorAll('[data-play-sequence], [data-show-all]').forEach((button) => {
+    button.disabled = true;
+  });
+}
+
+async function bootstrap() {
   const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
   const container = document.getElementById('brain-canvas');
   const hitArea = document.getElementById('stage-hit');
@@ -115,26 +139,34 @@ function bootstrap() {
     element.dataset.stage = element.closest('section')?.id ?? '';
   });
 
+  // Copy and controls go live at once. The UI reaches the scene through a getter, so its
+  // controls work before the model exists and drive it once it does.
   let scene = null;
+  const ui = initUI({ getScene: () => scene, motionQuery });
+  document.body.classList.add('scene-loading');
+  setStageStatus(STAGE_LOADING);
+
+  let stageOrder;
   try {
-    scene = new BrainScene(container, { reducedMotion: motionQuery.matches, hitArea });
+    const brain = await import('./brain.js');
+    stageOrder = brain.STAGE_ORDER;
+    scene = new brain.BrainScene(container, { reducedMotion: motionQuery.matches, hitArea });
   } catch {
     showSceneFallback();
+    return;
   }
 
   window.__scene = scene;
   // The UI modules were written against one scene per section; they now share the one.
-  const scenes = { overview: scene, simulator: scene, structures: scene, angles: scene };
-  window.__scenes = scenes;
+  window.__scenes = { overview: scene, simulator: scene, structures: scene, angles: scene };
 
-  const ui = initUI({ scenes, motionQuery });
-  if (scene) {
-    window.__rig = createScrollRig(scene, hitArea, ui.onStageChange);
-    // The scene was built before any stage window was known, so its first pose is the raw
-    // keyframe. Start from the framed pose instead of easing out to it on the first frames
-    // — for the hero that raw pose is inside the cortex.
-    scene.snapToRig();
-  }
+  // Handing the model to the section in view also restates that section's selection.
+  window.__rig = createScrollRig(scene, stageOrder, hitArea, ui.onStageChange);
+  // The scene was built before any stage window was known, so its first pose is the raw
+  // keyframe. Start from the framed pose instead of easing out to it on the first frames
+  // — for the hero that raw pose is inside the cortex.
+  scene.snapToRig();
+  document.body.classList.replace('scene-loading', 'scene-ready');
 }
 
 if (document.readyState === 'loading') {

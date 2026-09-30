@@ -563,14 +563,65 @@ h3 {
   line-height: 1.55;
 }
 
-.brain-loading {
+/* What a stage says while the model is on its way, or if it cannot start. */
+.stage-status {
   position: absolute;
   inset: 0;
   display: grid;
-  place-items: center;
+  place-content: center;
+  justify-items: center;
+  gap: 0.9rem;
   margin: 0;
+  padding: 1.5rem;
   color: var(--muted);
-  font-size: 0.95rem;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-align: center;
+  pointer-events: none;
+}
+
+.scene-loading .stage-status::before {
+  content: "";
+  width: 28px;
+  height: 28px;
+  border: 1.5px solid var(--line-strong);
+  border-top-color: var(--bio);
+  border-radius: 50%;
+  animation: stage-spin 900ms linear infinite;
+}
+
+@keyframes stage-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.scene-ready .stage-status {
+  display: none;
+}
+
+/* Without WebGL there is nothing for the fixed layer to show. */
+.no-webgl .brain-canvas,
+.no-webgl .stage-hit {
+  display: none;
+}
+
+/* The model arrives rather than appears. */
+.brain-canvas canvas {
+  animation: canvas-in 700ms ease both;
+}
+
+@keyframes canvas-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.primary-action:disabled,
+.secondary-action:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .brain-label-layer {

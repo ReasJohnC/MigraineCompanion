@@ -893,7 +893,6 @@ export class BrainScene {
     this.renderer.toneMappingExposure = 1.04;
     this.renderer.domElement.setAttribute('aria-hidden', 'true');
     this.container.appendChild(this.renderer.domElement);
-    this.container.querySelector('.brain-loading')?.remove();
 
     this.labelLayer = document.createElement('div');
     this.labelLayer.className = 'brain-label-layer';
