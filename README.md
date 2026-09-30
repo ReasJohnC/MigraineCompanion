@@ -1,5 +1,7 @@
 # Migraine Companion
 
+## This build is contains edits as requested by Lynn, but some edits are still underway to refine the UI and fix some bugs in animation movement.
+
 A static, interactive migraine companion. It visualizes the
 companion's hypothesis that a migraine can begin when an "energy force" enters a deep-brain
 **Prodrome Zone** at a specific **angle** — different angles striking different structures and
