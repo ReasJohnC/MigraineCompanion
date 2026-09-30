@@ -257,17 +257,23 @@ function initNavigation() {
   const toggle = document.querySelector('.nav-toggle');
   const links = Array.from(document.querySelectorAll('.nav-links a'));
 
-  toggle?.addEventListener('click', () => {
-    const open = !nav.classList.contains('is-open');
-    nav.classList.toggle('is-open', open);
-    toggle.setAttribute('aria-expanded', String(open));
-  });
+  const isOpen = () => Boolean(nav?.classList.contains('is-open'));
+  const setOpen = (open, { restoreFocus = false } = {}) => {
+    nav?.classList.toggle('is-open', open);
+    toggle?.setAttribute('aria-expanded', String(open));
+    if (!open && restoreFocus) toggle?.focus();
+  };
 
-  links.forEach((link) => {
-    link.addEventListener('click', () => {
-      nav?.classList.remove('is-open');
-      toggle?.setAttribute('aria-expanded', 'false');
-    });
+  toggle?.addEventListener('click', () => setOpen(!isOpen()));
+  links.forEach((link) => link.addEventListener('click', () => setOpen(false)));
+
+  // A menu only its own toggle can close strands a keyboard reader inside it, and a touch
+  // reader behind it.
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && isOpen()) setOpen(false, { restoreFocus: true });
+  });
+  document.addEventListener('click', (event) => {
+    if (isOpen() && !nav.contains(event.target)) setOpen(false);
   });
 
   const sections = links
@@ -631,6 +637,7 @@ function initAnglesModule(anglesScene, motionQuery) {
   const resetLabel = () => {
     if (!playButton) return;
     playButton.textContent = stepped() ? 'Next angle' : 'Play sequence';
+    playButton.dataset.playing = 'false';
   };
 
   const stepOnce = () => {
@@ -647,7 +654,10 @@ function initAnglesModule(anglesScene, motionQuery) {
 
   const play = async () => {
     playing = true;
-    if (playButton) playButton.textContent = 'Stop';
+    if (playButton) {
+      playButton.textContent = 'Stop';
+      playButton.dataset.playing = 'true';
+    }
     setStatus('The force enters at each angle in turn.');
     const completed = await anglesScene.playSequence(BEAM_SEQUENCE, { onCross: (id) => setStatus(readout(id)) });
     if (completed) setStatus(SEQUENCE_COMPLETE);

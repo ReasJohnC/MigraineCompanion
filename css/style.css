@@ -32,7 +32,7 @@
 
   --radius: 4px;
   --radius-lg: 6px;
-  --nav-height: 72px;
+  --nav-height: 64px;
   --font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   /* The HUD register. Real numbers set in mono are what separate an instrument from a
      picture of one. */
@@ -137,8 +137,8 @@ main,
 }
 
 .stage-window:focus-visible {
-  outline: 3px solid var(--accent);
-  outline-offset: 8px;
+  outline: 2px solid var(--bio);
+  outline-offset: 6px;
 }
 
 * {
@@ -158,6 +158,20 @@ body {
   font-size: 16px;
   line-height: 1.6;
   text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* The copy scrims bleed past their columns by design; clip keeps that from ever becoming
+   sideways scroll on a phone without making main a scroll container (sticky still works). */
+main {
+  overflow-x: clip;
+}
+
+/* One focus treatment for every control. Cool, because warm means the force. */
+:where(a, button, input, [tabindex]):focus-visible {
+  outline: 2px solid var(--bio);
+  outline-offset: 3px;
 }
 
 img,
@@ -207,19 +221,20 @@ a {
 
 /* No backdrop-filter anywhere on this page: the canvas behind it repaints every frame,
    so each blurred surface re-blurs on every frame whether or not anything else moved —
-   it was the single largest scroll cost. Flat, slightly deeper translucency instead. */
+   it was the single largest scroll cost. The header is simply opaque: at 92% every
+   heading that scrolled under it ghosted through. The hairline is a box-shadow so the
+   header's height is exactly --nav-height, which is what scroll-margin-top matches. */
 .site-header {
   position: sticky;
   top: 0;
   z-index: 50;
-  border-bottom: 1px solid var(--line);
-  background: rgba(5, 7, 13, 0.92);
+  background-color: var(--void);
+  box-shadow: 0 1px 0 var(--line);
 }
 
 .site-nav {
-  position: relative;
   display: flex;
-  min-height: var(--nav-height);
+  height: var(--nav-height);
   align-items: center;
   justify-content: space-between;
   gap: 1.5rem;
@@ -230,73 +245,113 @@ a {
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 0.72rem;
+  gap: 0.7rem;
   color: var(--text);
   font-size: 0.95rem;
-  font-weight: 700;
+  font-weight: 650;
+  letter-spacing: -0.005em;
   text-decoration: none;
 }
 
 .brand-mark {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   border: 1.5px solid var(--bio-dim);
   border-radius: 50%;
   background:
     linear-gradient(90deg, transparent 46%, rgba(95, 143, 153, 0.32) 47%, rgba(95, 143, 153, 0.32) 53%, transparent 54%),
-    radial-gradient(circle at 57% 42%, rgba(255, 122, 69, 0.5) 0 10%, transparent 11%),
+    radial-gradient(circle at 57% 42%, var(--accent) 0 12%, transparent 13%),
     rgba(8, 12, 22, 0.9);
 }
 
 .nav-links {
   display: flex;
   align-items: center;
-  gap: 0.2rem;
+  gap: 0.1rem;
 }
 
 .nav-links a {
-  border-radius: 6px;
+  position: relative;
+  border-radius: var(--radius);
   color: var(--muted);
-  font-size: 0.9rem;
+  font-size: 0.875rem;
   font-weight: 600;
-  padding: 0.55rem 0.75rem;
+  padding: 0.5rem 0.8rem;
   text-decoration: none;
+  transition: color 160ms ease;
+}
+
+/* The indicator sits on the header's bottom edge whatever the link's own height: 100% in
+   an absolute box's `bottom` is the link's height, so this is half the difference. */
+.nav-links a::after {
+  content: "";
+  position: absolute;
+  left: 0.8rem;
+  right: 0.8rem;
+  bottom: calc((100% - var(--nav-height)) / 2);
+  height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: var(--bio);
+  transform: scaleX(0);
+  transition: transform 220ms ease;
 }
 
 .nav-links a:hover,
-.nav-links a:focus-visible,
 .nav-links a.is-active {
   color: var(--text);
-  background: var(--bg-soft);
-  outline: none;
+}
+
+.nav-links a.is-active::after {
+  transform: scaleX(1);
 }
 
 .nav-toggle {
   display: none;
-  width: 42px;
-  height: 42px;
+  width: 44px;
+  height: 44px;
   align-items: center;
   justify-content: center;
   flex-direction: column;
   gap: 4px;
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  background: var(--surface);
+  margin-right: -6px;
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: transparent;
   color: var(--text);
+  cursor: pointer;
 }
 
 .nav-toggle span {
-  width: 17px;
+  width: 18px;
   height: 2px;
+  border-radius: 1px;
   background: currentColor;
+  transition:
+    transform 220ms ease,
+    opacity 160ms ease;
+}
+
+/* Bars 2px tall with a 4px gap: 6px between centres folds them into a cross. */
+.nav-toggle[aria-expanded="true"] span:nth-child(1) {
+  transform: translateY(6px) rotate(45deg);
+}
+
+.nav-toggle[aria-expanded="true"] span:nth-child(2) {
+  opacity: 0;
+}
+
+.nav-toggle[aria-expanded="true"] span:nth-child(3) {
+  transform: translateY(-6px) rotate(-45deg);
 }
 
 .section {
   border-bottom: 1px solid var(--line);
 }
 
+/* Flush under the header: a larger margin left a strip of the previous section, its
+   border included, showing under the header after every nav jump. */
 main > section {
-  scroll-margin-top: calc(var(--nav-height) + 24px);
+  scroll-margin-top: var(--nav-height);
 }
 
 .section-inner {
@@ -314,15 +369,16 @@ main > section {
     radial-gradient(90% 85% at 2% 96%, rgba(255, 122, 69, 0.11), transparent 55%);
 }
 
+/* Equal halves: the headline's size is derived from this column's width (see h1). */
 .hero-grid {
   display: grid;
-  grid-template-columns: minmax(0, 0.92fr) minmax(420px, 1.08fr);
-  gap: clamp(2rem, 5vw, 5.4rem);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: clamp(2rem, 4.5vw, 4rem);
   align-items: center;
 }
 
 .hero-copy {
-  max-width: 620px;
+  max-width: 580px;
 }
 
 h1,
@@ -332,33 +388,54 @@ p {
   margin-top: 0;
 }
 
+h1,
+h2,
+h3,
+.section-hook {
+  text-wrap: balance;
+}
+
+p,
+li {
+  text-wrap: pretty;
+}
+
+/* The headline's longest unbreakable run, "Neural Neighborhood", is 9.73em wide in the
+   system face. Sized so it fits the hero column with room for wider platform fonts, the
+   headline sets in three balanced lines instead of stranding "Neural" on its own. */
 h1 {
-  margin-bottom: 1.25rem;
-  /* Sized so "Neighborhood" sets on one line inside .hero-copy. */
-  font-size: clamp(2.5rem, 4.6vw, 4.6rem);
-  line-height: 1.02;
+  margin-bottom: 1.35rem;
+  font-size: clamp(2.25rem, 3.75vw, 3.375rem);
+  line-height: 1.04;
   font-weight: 700;
-  max-width: 14ch;
+  letter-spacing: -0.02em;
 }
 
 h2 {
   margin-bottom: 1rem;
-  font-size: clamp(2.25rem, 4vw, 4.4rem);
-  line-height: 1;
+  font-size: clamp(1.9rem, 2.9vw, 2.75rem);
+  line-height: 1.06;
   font-weight: 700;
+  letter-spacing: -0.015em;
 }
 
 h3 {
   margin-bottom: 0.6rem;
-  font-size: clamp(1.35rem, 2vw, 2rem);
-  line-height: 1.12;
-  font-weight: 700;
+  font-size: clamp(1.2rem, 1.6vw, 1.45rem);
+  line-height: 1.2;
+  font-weight: 650;
+  letter-spacing: -0.005em;
 }
 
 .hero-thesis,
 .copy-column p,
 .detail-panel p {
   color: var(--muted);
+}
+
+.copy-column p,
+.detail-panel p {
+  max-width: 64ch;
 }
 
 /* The specimen is behind the copy now, not beside it. A soft well of the page base keeps
@@ -373,10 +450,11 @@ h3 {
   isolation: isolate;
 }
 
+/* The footer has an opaque ground of its own, and its scrim bled 48px past the end of the
+   document, so it is not in this list. */
 .copy-column::before,
 .hero-copy::before,
-.narrow-layout::before,
-.footer-grid::before {
+.narrow-layout::before {
   content: "";
   position: absolute;
   /* Generous bleed so the gradient reaches zero inside its own box and leaves no edge. */
@@ -393,22 +471,18 @@ h3 {
 }
 
 .hero-thesis {
-  max-width: 58ch;
-  font-size: clamp(1.05rem, 1.7vw, 1.25rem);
+  max-width: 54ch;
+  font-size: clamp(1.05rem, 1.35vw, 1.2rem);
+  line-height: 1.65;
 }
 
 .model-section {
-  padding: clamp(4.5rem, 8vw, 8rem) 0;
+  padding: clamp(4.5rem, 8vw, 7.5rem) 0;
 }
 
-/* Barely-there washes: any solid section background would hide the scene behind it. */
-.section {
-  background: var(--cool-tint);
-}
-
-.alt-section {
-  background: var(--warm-tint);
-}
+/* No section washes: the sections sit above the canvas, so a tint over a section tinted
+   the specimen with it, and the alternating warm one read as a muddy brown band. One
+   ground, with hairlines for rhythm. */
 
 .split-layout {
   display: grid;
@@ -452,25 +526,41 @@ h3 {
    as body text while the rest read as data. */
 .copy-column .section-number,
 .section-number {
-  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.1rem;
   color: var(--bio);
-  font-size: 0.78rem;
-  font-weight: 700;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+/* A short index rule after the number: the instrument's tick, not a divider. */
+.section-number::after {
+  content: "";
+  width: 2rem;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.45;
 }
 
 .section-hook {
   color: var(--text) !important;
-  font-size: clamp(1.15rem, 2vw, 1.55rem);
-  line-height: 1.32;
-  font-weight: 600;
+  font-size: clamp(1.1rem, 1.45vw, 1.3rem);
+  line-height: 1.4;
+  font-weight: 550;
+  letter-spacing: -0.005em;
 }
 
 .caption {
-  margin-top: 1.2rem;
+  margin-top: 1.4rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
   color: var(--muted);
-  font-size: 0.92rem;
-  line-height: 1.5;
+  font-size: 0.875rem;
+  line-height: 1.55;
 }
 
 .brain-loading {
@@ -552,21 +642,21 @@ h3 {
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.6rem;
   min-height: 44px;
   border: 1px solid var(--line-control);
-  border-radius: 999px;
+  border-radius: var(--radius-lg);
   background: rgba(11, 18, 32, 0.82);
   color: var(--text);
   cursor: pointer;
-  font-size: 0.88rem;
-  font-weight: 700;
-  padding: 0.58rem 0.88rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  padding: 0.55rem 1rem 0.55rem 0.85rem;
   transition:
     border-color 180ms ease,
+    background-color 180ms ease,
     box-shadow 180ms ease,
-    color 180ms ease,
-    transform 180ms ease;
+    color 180ms ease;
 }
 
 /* Selection was signalled by colour alone. The indicator fills as well as recolours, so
@@ -586,14 +676,16 @@ h3 {
 
 .chip:hover {
   border-color: var(--bio-dim);
-  transform: translateY(-1px);
+  background-color: rgba(16, 26, 44, 0.9);
 }
 
+/* Selected: the warm ring says the force is aimed here; the filled dot says it without
+   colour. No glow — the selection is a state, not an event. */
 .chip[aria-pressed="true"],
 .chip[aria-checked="true"] {
-  border-color: rgba(255, 122, 69, 0.82);
-  color: var(--accent-deep);
-  box-shadow: 0 0 0 3px rgba(255, 122, 69, 0.12);
+  border-color: rgba(255, 122, 69, 0.85);
+  background-color: rgba(255, 122, 69, 0.08);
+  color: var(--accent-hot);
 }
 
 .chip[aria-pressed="true"]::before,
@@ -601,14 +693,6 @@ h3 {
   border-color: var(--accent);
   background: var(--accent);
   box-shadow: inset 0 0 0 2px var(--void);
-}
-
-.chip:focus-visible,
-.primary-action:focus-visible,
-.secondary-action:focus-visible,
-.nav-toggle:focus-visible {
-  outline: 3px solid rgba(255, 122, 69, 0.35);
-  outline-offset: 3px;
 }
 
 .detail-panel {
@@ -699,26 +783,48 @@ h3 {
 
 .primary-action,
 .secondary-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
   min-height: 46px;
-  border-radius: 7px;
+  border-radius: var(--radius-lg);
   cursor: pointer;
-  font-size: 0.93rem;
-  font-weight: 700;
-  padding: 0.72rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 0.7rem 1.15rem;
   transition:
-    transform 180ms ease,
     border-color 180ms ease,
-    background-color 180ms ease;
+    background-color 180ms ease,
+    color 180ms ease;
 }
 
+/* Play fires the force, so it is the one warm button on the page. */
 .primary-action {
   border: 1px solid var(--accent);
-  background: rgba(255, 122, 69, 0.16);
-  color: var(--accent-deep);
+  background: rgba(255, 122, 69, 0.14);
+  color: var(--accent-hot);
 }
 
 .primary-action:hover {
-  background: rgba(255, 122, 69, 0.24);
+  background: rgba(255, 122, 69, 0.22);
+}
+
+/* The glyph is drawn, not typed, so the button's label stays exactly the words it has: a
+   play triangle, or a stop square while the sequence runs. */
+.primary-action::before {
+  content: "";
+  flex: none;
+  width: 0.62rem;
+  height: 0.72rem;
+  background: currentColor;
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+
+.primary-action[data-playing="true"]::before {
+  width: 0.62rem;
+  height: 0.62rem;
+  clip-path: inset(0 round 1px);
 }
 
 .secondary-action {
@@ -727,33 +833,30 @@ h3 {
   color: var(--text);
 }
 
-.primary-action:hover,
-.secondary-action:hover {
-  transform: translateY(-1px);
-}
-
 .secondary-action:hover {
   border-color: var(--bio-dim);
+  background: rgba(16, 26, 44, 0.8);
 }
 
 .sequence-status {
   min-height: 1.5rem;
-  margin-top: 0.9rem;
+  margin-top: 1rem;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  line-height: 1.55;
+}
+
+.site-footer {
+  padding: clamp(3rem, 6vw, 4.5rem) 0 clamp(3rem, 6vw, 5rem);
+  background: var(--bg-soft);
   color: var(--muted);
   font-size: 0.9rem;
 }
 
-.site-footer {
-  padding: clamp(2.5rem, 5vw, 4rem) 0;
-  background: var(--bg-soft);
-  color: var(--muted);
-  font-size: 0.92rem;
-}
-
 .footer-grid {
   display: grid;
-  gap: 1rem;
-  max-width: 72ch;
+  gap: 1.1rem;
+  max-width: 68ch;
 }
 
 .site-footer p {
@@ -763,15 +866,16 @@ h3 {
 .footer-note {
   color: var(--text);
   font-size: 1rem;
+  line-height: 1.6;
 }
 
 .footer-disclaimer {
   padding-left: 0.95rem;
-  border-left: 3px solid var(--accent);
+  border-left: 2px solid var(--accent);
   color: var(--text);
   font-style: italic;
   font-weight: 600;
-  font-size: 0.98rem;
+  font-size: 0.95rem;
 }
 
 .footer-citation cite {
@@ -790,10 +894,6 @@ h3 {
   .split-layout--reverse,
   .interactive-layout {
     grid-template-columns: 1fr;
-  }
-
-  h1 {
-    max-width: 15ch;
   }
 
   .section-heading {
@@ -819,7 +919,7 @@ h3 {
 
 @media (max-width: 720px) {
   :root {
-    --nav-height: 64px;
+    --nav-height: 60px;
   }
 
   .site-nav {
@@ -827,30 +927,53 @@ h3 {
   }
 
   .nav-toggle {
-  display: inline-flex;
+    display: inline-flex;
   }
 
+  /* A full-width sheet hung from the header (the header is sticky, so it is the containing
+     block), opaque for the same reason the header is. */
   .nav-links {
     position: absolute;
     left: 0;
     right: 0;
-    top: calc(100% + 1px);
-  display: none;
+    top: 100%;
+    display: none;
     flex-direction: column;
     align-items: stretch;
     gap: 0;
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    background: rgba(8, 12, 22, 0.97);
-    padding: 0.35rem;
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    background-color: var(--void);
+    padding: 0.4rem 0 0.8rem;
   }
 
   .site-nav.is-open .nav-links {
-  display: flex;
+    display: flex;
   }
 
   .nav-links a {
-  padding: 0.85rem;
+    display: flex;
+    align-items: center;
+    min-height: 52px;
+    padding: 0 12px 0 calc(12px + 0.9rem);
+    border-radius: 0;
+    font-size: 1rem;
+  }
+
+  /* In the sheet the indicator is a bar on the leading edge. */
+  .nav-links a::after {
+    left: 12px;
+    right: auto;
+    top: 14px;
+    bottom: 14px;
+    width: 2px;
+    height: auto;
+    border-radius: 2px;
+    transform: scaleY(0);
+  }
+
+  .nav-links a.is-active::after {
+    transform: scaleY(1);
   }
 
   .section-inner {
@@ -859,15 +982,17 @@ h3 {
 
   .hero,
   .model-section {
-  padding: 3.4rem 0;
+    padding: 3.5rem 0;
   }
 
+  /* 9vw keeps "Neural Neighborhood" inside a 320–414px column with a margin for wider
+     platform faces, so the headline still sets in three lines. */
   h1 {
-  font-size: clamp(2.6rem, 14vw, 4.1rem);
+    font-size: clamp(1.8rem, 9vw, 2.25rem);
   }
 
   .chip-list {
-  display: grid;
+    display: grid;
     grid-template-columns: 1fr;
   }
 
@@ -963,15 +1088,20 @@ h3 {
 
 .accordion {
   display: grid;
-  gap: 0.85rem;
+  gap: 0.75rem;
   margin-bottom: clamp(2rem, 4vw, 3rem);
 }
 
 .accordion-item {
-  border: 1px solid var(--line-control);
-  border-radius: var(--radius);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
   background: rgba(11, 18, 32, 0.82);
   overflow: hidden;
+  transition: border-color 180ms ease;
+}
+
+.accordion-item:has(.accordion-trigger[aria-expanded="true"]) {
+  border-color: var(--line-control);
 }
 
 .accordion-heading {
@@ -984,77 +1114,62 @@ h3 {
   align-items: center;
   gap: 0.9rem;
   width: 100%;
-  padding: 1.05rem clamp(1rem, 2.5vw, 1.6rem);
+  min-height: 60px;
+  padding: 0.9rem clamp(1rem, 2.2vw, 1.4rem);
   border: 0;
   background: transparent;
   color: var(--text);
   font: inherit;
   text-align: left;
   cursor: pointer;
-  transition: background 160ms ease;
+  transition: background-color 160ms ease;
 }
 
 .accordion-trigger:hover {
-  background: rgba(65, 212, 200, 0.07);
+  background-color: rgba(65, 212, 200, 0.05);
 }
 
 .accordion-trigger:focus-visible {
   outline: 2px solid var(--bio);
-  outline-offset: -3px;
+  outline-offset: -2px;
+  border-radius: var(--radius-lg);
 }
 
 .accordion-label {
   flex: 1;
-  font-size: clamp(1.05rem, 1.8vw, 1.28rem);
-  font-weight: 700;
+  font-size: clamp(1.02rem, 1.4vw, 1.15rem);
+  font-weight: 650;
+  letter-spacing: -0.005em;
 }
 
+/* A chevron that turns rather than a plus that loses a stroke: it points at what opening
+   does. */
 .accordion-icon {
-  position: relative;
-  width: 16px;
-  height: 16px;
   flex: none;
+  width: 9px;
+  height: 9px;
+  margin: 0 4px 4px 0;
+  border-right: 2px solid var(--bio);
+  border-bottom: 2px solid var(--bio);
+  transform: rotate(45deg);
+  transition: transform 220ms ease, margin 220ms ease;
 }
 
-.accordion-icon::before,
-.accordion-icon::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  background: var(--bio);
-  transform: translate(-50%, -50%);
-  transition: opacity 180ms ease;
-}
-
-.accordion-icon::before {
-  width: 14px;
-  height: 2px;
-}
-
-.accordion-icon::after {
-  width: 2px;
-  height: 14px;
-}
-
-.accordion-trigger[aria-expanded="true"] .accordion-icon::after {
-  opacity: 0;
-}
-
-.accordion-trigger[aria-expanded="true"] {
-  background: rgba(65, 212, 200, 0.07);
+.accordion-trigger[aria-expanded="true"] .accordion-icon {
+  margin: 4px 4px 0 0;
+  transform: rotate(-135deg);
 }
 
 .accordion-panel {
-  padding: 0 clamp(1rem, 2.5vw, 1.6rem) 1.4rem;
+  padding: 0 clamp(1rem, 2.2vw, 1.4rem) 1.4rem;
   border-top: 1px solid var(--line);
 }
 
 .aura-note {
-  margin: 1rem 0 0;
+  margin: 1.1rem 0 0;
   color: var(--accent-deep);
-  font-size: 0.92rem;
-  font-weight: 600;
+  font-size: 0.875rem;
+  font-weight: 500;
 }
 
 /* ---------- Simulator: symptom controls ---------- */
@@ -1064,71 +1179,94 @@ h3 {
 }
 
 .block-label {
-  margin-bottom: 0.6rem;
+  margin-bottom: 0.7rem;
   color: var(--text);
-  font-size: 0.86rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .block-hint {
-  margin-top: -0.35rem;
-  margin-bottom: 0.7rem;
+  margin-top: -0.4rem;
+  margin-bottom: 0.8rem;
   color: var(--muted);
-  font-size: 0.92rem;
+  font-size: 0.875rem;
 }
 
 .combination-block {
-  margin-top: 1.6rem;
+  margin-top: 1.5rem;
   padding-top: 1.3rem;
-  border-top: 1px dashed var(--line-strong);
+  border-top: 1px solid var(--line);
 }
 
 .check-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.6rem;
+  gap: 0.55rem;
 }
 
 .check-chip {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.9rem;
+  gap: 0.6rem;
+  min-height: 44px;
+  padding: 0.5rem 1rem 0.5rem 0.8rem;
   border: 1px solid var(--line-control);
-  border-radius: 999px;
+  border-radius: var(--radius-lg);
   background: rgba(11, 18, 32, 0.55);
-  color: var(--muted);
-  font-size: 0.94rem;
+  color: var(--text);
+  font-size: 0.875rem;
+  font-weight: 500;
   cursor: pointer;
   transition:
     border-color 160ms ease,
+    background-color 160ms ease,
     color 160ms ease;
 }
 
 .check-chip:hover {
-  border-color: var(--bio);
-  color: var(--text);
+  border-color: var(--bio-dim);
+  background-color: rgba(16, 26, 44, 0.8);
 }
 
+/* Drawn by the page: the OS box was a white square in a dark instrument. The tick is an
+   SVG in the background so it renders the same in every engine. */
 .check-chip input {
-  width: 15px;
-  height: 15px;
-  accent-color: var(--accent);
+  appearance: none;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  border: 1.5px solid var(--line-control);
+  border-radius: 4px;
+  background: transparent center / 12px 12px no-repeat;
   cursor: pointer;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+
+.check-chip input:checked {
+  border-color: var(--accent);
+  background-color: var(--accent);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.2 5 8.6 9.6 3.6' fill='none' stroke='%2305070d' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+.check-chip input:focus-visible {
+  outline: none;
 }
 
 .check-chip:has(input:checked) {
-  border-color: var(--accent);
-  background: var(--warm-tint);
-  color: var(--text);
-  font-weight: 600;
+  border-color: rgba(255, 122, 69, 0.85);
+  background-color: rgba(255, 122, 69, 0.08);
+  color: var(--accent-hot);
 }
 
 .check-chip:has(input:focus-visible) {
   outline: 2px solid var(--bio);
-  outline-offset: 2px;
+  outline-offset: 3px;
 }
 
 /* ---------- Simulator: readout ---------- */
@@ -1300,41 +1438,15 @@ h3 {
 
 .reveal {
   opacity: 0;
-  transform: translateY(12px);
+  transform: translateY(10px);
   transition:
-    opacity 380ms cubic-bezier(0.2, 0.8, 0.2, 1) var(--reveal-delay, 0ms),
-    transform 380ms cubic-bezier(0.2, 0.8, 0.2, 1) var(--reveal-delay, 0ms);
+    opacity 420ms cubic-bezier(0.2, 0.8, 0.2, 1) var(--reveal-delay, 0ms),
+    transform 420ms cubic-bezier(0.2, 0.8, 0.2, 1) var(--reveal-delay, 0ms);
 }
 
 .reveal.is-revealed {
   opacity: 1;
   transform: none;
-}
-
-/* A scan line crossing the control on hover, and a ring that draws rather than appears. */
-.chip {
-  position: relative;
-  overflow: hidden;
-}
-
-.chip::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: linear-gradient(
-    100deg,
-    transparent 30%,
-    rgba(65, 212, 200, 0.16) 50%,
-    transparent 70%
-  );
-  transform: translateX(-120%);
-  transition: transform 520ms cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-.chip:hover::after,
-.chip:focus-visible::after {
-  transform: translateX(120%);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1343,9 +1455,5 @@ h3 {
     opacity: 1;
     transform: none;
     transition: none;
-  }
-
-  .chip::after {
-    display: none;
   }
 }
