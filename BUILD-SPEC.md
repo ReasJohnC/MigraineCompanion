@@ -17,8 +17,7 @@ force-beam pass through specific structures at distinct angles.
 - Responsive (sharp on phone + desktop). Accessible: keyboard-operable chips, aria labels,
   respects `prefers-reduced-motion` (instant final state, no auto-travel when set).
 - Aesthetic: a **dark, advanced-biotechnology instrument**. Superseded the original
-  "minimalist medical line-art, white space" brief on 2026-08-04; see
-  `ai/plans/2026-08-03-audit-and-biotech-redesign.md` §C0 for why, and what survived.
+  "minimalist medical line-art, white space" brief on 2026-08-04.
   - **Two hues, one rule.** WARM (`--accent` #ff7a45) is the hypothesised force. COOL
     (`--bio` #41d4c8) is the instrument measuring it: readouts, angles, section indices.
     Nothing measured is ever warm, and the force is never cool. That rule is what keeps a
@@ -153,8 +152,6 @@ from the source copy.
 - Persist last-selected structure in `localStorage`; restore on load.
 
 ## Acceptance criteria
-Measured, not asserted: `node ai/verify/geometry.mjs` and `node ai/verify/check.mjs`.
-See `ai/verify/README.md`.
 
 - Loads with **NO console errors or warnings**, on load and through every interaction.
 - All four structure chips work; **#1 shows no beam**; #4 sequence + show-all work.

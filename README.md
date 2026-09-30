@@ -12,8 +12,6 @@ producing different prodrome (pre-migraine) symptoms.
   same module graph).
 - `content/` — source draft copy per structure (the site text is built from these).
 - `BUILD-SPEC.md` — the build specification, updated for the dark-instrument direction.
-- `ai/plans/` — the 2026-08-03 audit and redesign plan. `ai/verify/` — the harness that
-  measures it (`node ai/verify/check.mjs`).
 - `*.sh` — Codex fan-out helper scripts used during the build (not needed to run the site).
 
 ## Run locally
