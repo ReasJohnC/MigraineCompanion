@@ -20,10 +20,13 @@ const CEREBELLUM_BASE_COLOR = new THREE.Color(0xbc8e88);
 const CEREBELLUM_RIDGE_COLOR = new THREE.Color(0xd7aba1);
 const CEREBELLUM_GROOVE_COLOR = new THREE.Color(0x765554);
 
+// Callouts, not tags: each label stands off its structure on its own bearing (screen
+// pixels at a 620px-wide stage), joined by a leader line. Centred on their structures, the
+// three — which sit within 0.3 units of one another — stacked into one pile.
 const CORE_MARKERS = [
-  { label: 'Thalamus', position: [-0.05, 0.02, 0] },
-  { label: 'Hypothalamus', position: [0.05, -0.16, 0] },
-  { label: 'Pineal', position: [-0.28, 0.05, 0] },
+  { label: 'Thalamus', position: [-0.05, 0.02, 0], offset: [58, -92] },
+  { label: 'Hypothalamus', position: [0.05, -0.16, 0], offset: [104, 62] },
+  { label: 'Pineal', position: [-0.28, 0.05, 0], offset: [-104, -52] },
 ];
 
 // Where the camera goes when a single structure is selected, overriding the section's
@@ -81,20 +84,26 @@ const STAGE_KEYFRAMES = {
   },
   // A close orbit on the gland: this is the payoff section, and the shell is transparent
   // enough now to look through rather than around.
+  // The whole specimen, with the gland magnified in the loupe (see renderLoupe). The old
+  // close-up flooded the copy column with cerebellum while the gland stayed a speck; no
+  // single camera can show both the gland's crystals and where the gland sits.
   'pineal-body': {
     position: [0.68, 0.55, 1.15],
-    target: [-0.26, 0.04, 0],
+    target: [-0.12, -0.02, 0],
     fov: 28,
-    fill: 0.8,
+    fill: 1.06,
   },
   // Looking down the axis that opens the fan widest. Measured over every pair of beams,
   // the tightest apparent separation is 33.0° from here against 0.9° from the old 3/4
   // view, where four of the five lines collapsed into one bundle. This changes the
-  // viewpoint, never the vectors — see plan §C3.4.
+  // viewpoint, never the vectors — see plan §C3.4. A search over every direction found
+  // nothing lower that keeps the pairs apart (under 45° of elevation the best is 19°),
+  // and the idle sway alone drags the tightest pair to 8.6°, so here it settles to rest.
   'angles-of-force': {
     position: [1.24, 2.18, 0.78],
     target: [-0.02, -0.08, 0],
     fov: 40,
+    sway: 0,
   },
 };
 
@@ -146,6 +155,11 @@ function lerpKeyframeFill(u) {
 
 // How long the rig stays out of the way after the reader stops turning the model.
 const USER_CONTROL_HOLD = 2600;
+
+// The pineal loupe: the gland and its crystals drawn a second time, close up, on their own
+// render layer so nothing else in the specimen gets into the inset.
+const LOUPE_LAYER = 1;
+const LOUPE_DISTANCE = 0.4;
 
 // The idle sway: ±8°, once every half minute.
 const SWAY_AMPLITUDE = 0.14;
@@ -363,13 +377,16 @@ const CORTEX_NOISE_GLSL = /* glsl */ `
     return clamp(bands * 0.66 + mcFbm(p * 3.1 + vec3(2.7, -5.1, 1.6)) * 0.34, 0.0, 1.0);
   }
 
-  // Signed height of the cortical surface above its smooth base.
+  // Signed height of the cortical surface above its smooth base. Flat along the dorsal
+  // midline: displacing each lip of the fissure's crease along its own normal folded the
+  // triangles there into a visible sawtooth.
   float mcRelief(vec3 p) {
     float fold = mcFold(p);
     float ridge = smoothstep(0.4, 0.92, fold);
     float groove = 1.0 - smoothstep(0.12, 0.62, fold);
     float mask = 1.0 - smoothstep(0.5, 0.96, -p.y);
-    return (ridge * 0.07 - groove * 0.082) * mask;
+    float midline = mix(1.0, smoothstep(0.02, 0.16, abs(p.z)), smoothstep(-0.1, 0.35, p.y));
+    return (ridge * 0.07 - groove * 0.082) * mask * midline;
   }
 `;
 
@@ -440,16 +457,83 @@ function createCortexMaterial() {
          float fresnel = pow(1.0 - facing, 2.4);
          // Contour bands on the relief field, drifting slowly.
          float contour = abs(fract(vRelief * 19.0 - uTime * 0.05) - 0.5) * 2.0;
-         float isoline = (1.0 - smoothstep(0.0, 0.4, contour)) * 0.4;
+         // A whisper: at full strength the bands read as concentric squares and wood grain
+         // on the smooth lateral surface — a rendering fault, not a measurement.
+         float isoline = (1.0 - smoothstep(0.0, 0.4, contour)) * 0.1;
          gl_FragColor.rgb += vec3(0.24, 0.62, 0.6) * isoline * (0.4 + fresnel);
-         gl_FragColor.rgb += vec3(1.0, 0.74, 0.62) * pow(fresnel, 1.6) * 0.62;
-         gl_FragColor.a *= mix(0.17, 0.95, fresnel) + isoline * 0.2;`,
+         gl_FragColor.rgb += vec3(0.92, 0.8, 0.74) * pow(fresnel, 1.8) * 0.45;
+         gl_FragColor.a *= mix(0.15, 0.9, fresnel) + isoline * 0.2;`,
       );
 
     material.userData.shader = shader;
   };
 
   return material;
+}
+
+// The cerebellum and brainstem as the same scan shell as the cortex, without its relief:
+// nearly clear face-on, lit at the silhouette. As 60%-opaque double-sided solids they read
+// as plastic parts under a glass cortex.
+function createShellMaterial(color, { vertexColors = false, face = 0.28, edge = 0.9 } = {}) {
+  const material = new THREE.MeshStandardMaterial({
+    color,
+    roughness: 0.7,
+    metalness: 0,
+    transparent: true,
+    opacity: 1,
+    depthWrite: false,
+    side: THREE.FrontSide,
+    vertexColors,
+  });
+  material.onBeforeCompile = (shader) => {
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <dithering_fragment>',
+      `#include <dithering_fragment>
+       float facing = abs(dot(normalize(vNormal), normalize(vViewPosition)));
+       float fresnel = pow(1.0 - facing, 2.2);
+       gl_FragColor.rgb += vec3(0.92, 0.8, 0.74) * pow(fresnel, 1.8) * 0.35;
+       gl_FragColor.a *= mix(${face.toFixed(2)}, ${edge.toFixed(2)}, fresnel);`,
+    );
+  };
+  // three keys compiled programs on onBeforeCompile's source text, which is identical for
+  // every shell; without this the second shell would reuse the first one's opacities.
+  material.customProgramCacheKey = () => `shell:${face}:${edge}`;
+  return material;
+}
+
+// The Prodrome Zone as a boundary of light: clear inside, a faint warm edge where the eye
+// looks along its surface. A flat 12% fill read as a grey disc.
+function createZoneMaterial() {
+  return new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    fog: false,
+    blending: THREE.AdditiveBlending,
+    side: THREE.FrontSide,
+    uniforms: {
+      uColor: { value: new THREE.Color(0xffb08a) },
+    },
+    vertexShader: /* glsl */ `
+      varying vec3 vNormal;
+      varying vec3 vView;
+      void main() {
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        vNormal = normalize(normalMatrix * normal);
+        vView = -mv.xyz;
+        gl_Position = projectionMatrix * mv;
+      }
+    `,
+    fragmentShader: /* glsl */ `
+      uniform vec3 uColor;
+      varying vec3 vNormal;
+      varying vec3 vView;
+      void main() {
+        float facing = abs(dot(normalize(vNormal), normalize(vView)));
+        float edge = pow(1.0 - facing, 2.6);
+        gl_FragColor = vec4(uColor, 0.025 + edge * 0.28);
+      }
+    `,
+  });
 }
 
 // Deep tissue seen through the shell: warm forward scattering, a cool ambient wrap and a
@@ -486,7 +570,7 @@ function createDeepTissueMaterial(color, options = {}) {
 // the tube's centre line instead of its silhouette, so it reads as a filament with a soft
 // edge; a gaussian travelling along the length is the charge propagating, and it vanishes
 // when nothing is in flight.
-function createBeamMaterial({ color, width, intensity }) {
+function createBeamMaterial({ color, width, intensity, entry = 0, exit = 1 }) {
   return new THREE.ShaderMaterial({
     transparent: true,
     depthWrite: false,
@@ -500,6 +584,12 @@ function createBeamMaterial({ color, width, intensity }) {
       uIntensity: { value: intensity },
       // Position of the travelling pulse along the beam, or below zero for none.
       uPulse: { value: -1 },
+      // Where the line crosses the cortical hull, as progress along it. The trace fades in
+      // over a short approach outside the head and out just past the far surface: the
+      // force arrives from somewhere and ends in the tissue, where the full-length tube ran
+      // off-screen and showed its cut ends.
+      uEntry: { value: entry },
+      uExit: { value: exit },
     },
     vertexShader: /* glsl */ `
       varying vec2 vUv;
@@ -519,11 +609,17 @@ function createBeamMaterial({ color, width, intensity }) {
       uniform float uWidth;
       uniform float uIntensity;
       uniform float uPulse;
+      uniform float uEntry;
+      uniform float uExit;
       varying vec2 vUv;
       varying vec3 vNormal;
       varying vec3 vView;
 
       void main() {
+        float envelope = smoothstep(uEntry - 0.16, uEntry + 0.02, vUv.y)
+          * (1.0 - smoothstep(uExit - 0.02, uExit + 0.07, vUv.y));
+        if (envelope <= 0.001) discard;
+
         // Facing the camera is the middle of the tube; grazing is its edge.
         float facing = abs(dot(normalize(vNormal), normalize(vView)));
         float core = pow(facing, uWidth);
@@ -538,13 +634,53 @@ function createBeamMaterial({ color, width, intensity }) {
         }
 
         vec3 tint = mix(uColor, uHot, min(1.0, core * 0.55 + pulse));
-        float alpha = (core + glow) * uIntensity + pulse * 0.85;
+        float alpha = ((core + glow) * uIntensity + pulse * 0.85) * envelope;
         if (alpha <= 0.001) discard;
         gl_FragColor = vec4(tint, min(1.0, alpha));
       }
     `,
   });
 }
+
+// A soft radial falloff, drawn once and shared. The impact and the markers' halos are
+// light, not solid: as spheres they had hard edges, and the impact read as a white disc —
+// the brightest thing on the page, which a photophobic reader does not need.
+let glowTexture = null;
+function getGlowTexture() {
+  if (glowTexture) return glowTexture;
+  const size = 128;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const context = canvas.getContext('2d');
+  const gradient = context.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+  gradient.addColorStop(0.18, 'rgba(255, 255, 255, 0.6)');
+  gradient.addColorStop(0.45, 'rgba(255, 255, 255, 0.16)');
+  gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, size, size);
+  glowTexture = new THREE.CanvasTexture(canvas);
+  return glowTexture;
+}
+
+function createGlowSprite(color, opacity) {
+  return new THREE.Sprite(
+    new THREE.SpriteMaterial({
+      map: getGlowTexture(),
+      color,
+      transparent: true,
+      opacity,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      fog: false,
+    }),
+  );
+}
+
+// Glow sizes are sprite diameters in model units; the visible core is about a third.
+const FLARE_SIZE = 0.14;
+const MARKER_GLOW_SIZE = 0.16;
 
 // Both caches hand out clones and never the cached object itself, so a scene disposing
 // its own geometry cannot take the shared original down with it.
@@ -650,8 +786,8 @@ function createCerebellumGeometry() {
 
     position.setXYZ(i, x * (1 + displacement), y * (1 + displacement * 0.55), z * (1 + displacement));
 
-    color.copy(CEREBELLUM_BASE_COLOR).lerp(CEREBELLUM_RIDGE_COLOR, ridge * 0.42);
-    color.lerp(CEREBELLUM_GROOVE_COLOR, groove * 0.68);
+    color.copy(CEREBELLUM_BASE_COLOR).lerp(CEREBELLUM_RIDGE_COLOR, ridge * 0.3);
+    color.lerp(CEREBELLUM_GROOVE_COLOR, groove * 0.32);
     writeColor(colors, i, color);
     vertexCache.set(cacheKey, [
       x * (1 + displacement),
@@ -714,6 +850,7 @@ export class BrainScene {
     this.focusPose = null;
     this.delta = 0.016;
     this.swayClock = 0;
+    this.swayAmplitude = SWAY_AMPLITUDE;
     this.sequenceToken = 0;
     this.markers = new Map();
     this.beams = new Map();
@@ -771,6 +908,7 @@ export class BrainScene {
     this.createInteractiveMarkers();
     this.createBeams();
     this.createOverviewLabels();
+    this.createLoupe();
 
     // Pointer events arrive on a separate element tracking the active stage window: the
     // canvas itself is behind the whole document and must not swallow scrolls or clicks.
@@ -1029,8 +1167,12 @@ export class BrainScene {
   // holding the model, so it resumes without a jump.
   updateIdleSpin(now) {
     if (this.reducedMotion || now < this.userControlUntil) return;
+    // A stage can ask for stillness (the capstone's angles are its argument); the swing
+    // eases down to it rather than stopping dead.
+    const wanted = SWAY_AMPLITUDE * (STAGE_KEYFRAMES[this.stage]?.sway ?? 1);
+    this.swayAmplitude += (wanted - this.swayAmplitude) * (1 - Math.pow(0.05, this.delta));
     this.swayClock += this.delta;
-    this.root.rotation.y = SWAY_AMPLITUDE * Math.sin((this.swayClock * 2 * Math.PI) / SWAY_PERIOD);
+    this.root.rotation.y = this.swayAmplitude * Math.sin((this.swayClock * 2 * Math.PI) / SWAY_PERIOD);
   }
 
   updateRig(now) {
@@ -1054,31 +1196,30 @@ export class BrainScene {
   }
 
   createLights() {
-    this.scene.add(new THREE.HemisphereLight(0xfff8f3, 0xc9c1c5, 2.2));
+    const hemisphere = new THREE.HemisphereLight(0xfff8f3, 0xc9c1c5, 2.2);
 
     const key = new THREE.DirectionalLight(0xfff2e8, 2.35);
     key.position.set(2.4, 3.3, 2.6);
-    this.scene.add(key);
 
     const fill = new THREE.DirectionalLight(0xf0d7d0, 0.86);
     fill.position.set(-1.8, 0.8, 1.6);
-    this.scene.add(fill);
 
     const back = new THREE.DirectionalLight(0xffffff, 1.15);
     back.position.set(-2.2, 1.5, -1.35);
-    this.scene.add(back);
+
+    // Lights must be on the loupe's layer too: the renderer skips lights a camera's layers
+    // cannot see, and the gland would render unlit.
+    [hemisphere, key, fill, back].forEach((light) => {
+      light.layers.enable(LOUPE_LAYER);
+      this.scene.add(light);
+    });
   }
 
   createBrain() {
     const cortexMaterial = createCortexMaterial();
     this.cortexMaterial = cortexMaterial;
-    const cerebellumMaterial = makeTissueMaterial(0xffffff, 0.59, {
-      roughness: 0.86,
-      vertexColors: true,
-    });
-    const brainstemMaterial = makeTissueMaterial(0xb98a84, 0.6, {
-      roughness: 0.72,
-    });
+    const cerebellumMaterial = createShellMaterial(0xffffff, { vertexColors: true, face: 0.3 });
+    const brainstemMaterial = createShellMaterial(0xb98a84, { face: 0.34 });
     const innerMaterial = makeTissueMaterial(0x8e686d, 0.34, {
       roughness: 0.78,
     });
@@ -1121,16 +1262,7 @@ export class BrainScene {
     ventricle.renderOrder = 4;
     this.root.add(ventricle);
 
-    this.zone = new THREE.Mesh(
-      new THREE.SphereGeometry(1, 48, 24),
-      new THREE.MeshBasicMaterial({
-        color: 0xffc3a3,
-        transparent: true,
-        opacity: 0.12,
-        depthWrite: false,
-        side: THREE.DoubleSide,
-      }),
-    );
+    this.zone = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 24), createZoneMaterial());
     this.zone.scale.set(0.52, 0.36, 0.25);
     this.zone.position.set(-0.07, -0.04, 0);
     this.zone.renderOrder = 2;
@@ -1138,29 +1270,25 @@ export class BrainScene {
   }
 
   createCoreStructures() {
-    const thalamusMaterial = makeTissueMaterial(0xb77d78, 0.76, {
-      roughness: 0.68,
-    });
+    const thalamusMaterial = createDeepTissueMaterial(0xb58a84, { opacity: 0.82 });
     const thalamus = new THREE.Group();
     thalamus.position.set(-0.05, 0.02, 0);
 
     [-0.055, 0.055].forEach((zOffset) => {
-      const lobe = new THREE.Mesh(new THREE.SphereGeometry(1, 40, 20), thalamusMaterial.clone());
+      const lobe = new THREE.Mesh(new THREE.SphereGeometry(1, 40, 20), thalamusMaterial);
       lobe.scale.set(0.19, 0.14, 0.09);
       lobe.position.set(0, 0, zOffset);
       lobe.renderOrder = 5;
       thalamus.add(lobe);
     });
 
-    const thalamicBridge = new THREE.Mesh(new THREE.SphereGeometry(1, 28, 14), thalamusMaterial.clone());
+    const thalamicBridge = new THREE.Mesh(new THREE.SphereGeometry(1, 28, 14), thalamusMaterial);
     thalamicBridge.scale.set(0.09, 0.07, 0.05);
     thalamicBridge.renderOrder = 5;
     thalamus.add(thalamicBridge);
     this.root.add(thalamus);
 
-    const hypothalamusMaterial = makeTissueMaterial(0xc0877d, 0.78, {
-      roughness: 0.66,
-    });
+    const hypothalamusMaterial = createDeepTissueMaterial(0xbd8f86, { opacity: 0.84 });
     const hypothalamus = new THREE.Group();
     hypothalamus.position.set(0.05, -0.16, 0);
 
@@ -1171,7 +1299,7 @@ export class BrainScene {
 
     const infundibulum = new THREE.Mesh(
       new THREE.CylinderGeometry(0.024, 0.041, 0.13, 28, 4, true),
-      hypothalamusMaterial.clone(),
+      hypothalamusMaterial,
     );
     infundibulum.position.set(0.018, -0.088, 0);
     infundibulum.rotation.z = -0.08;
@@ -1179,11 +1307,7 @@ export class BrainScene {
     hypothalamus.add(infundibulum);
     this.root.add(hypothalamus);
 
-    const pinealMaterial = makeTissueMaterial(0xc98f82, 0.82, {
-      roughness: 0.62,
-      emissive: 0x4b201c,
-      emissiveIntensity: 0.1,
-    });
+    const pinealMaterial = createDeepTissueMaterial(0xc99a8e, { opacity: 0.88 });
     const pineal = new THREE.Group();
     pineal.position.set(-0.28, 0.05, 0);
 
@@ -1192,7 +1316,7 @@ export class BrainScene {
     pinealBody.renderOrder = 6;
     pineal.add(pinealBody);
 
-    const pinealTaper = new THREE.Mesh(new THREE.ConeGeometry(0.034, 0.068, 32, 1, true), pinealMaterial.clone());
+    const pinealTaper = new THREE.Mesh(new THREE.ConeGeometry(0.034, 0.068, 32, 1, true), pinealMaterial);
     pinealTaper.position.set(-0.036, 0, 0);
     pinealTaper.rotation.z = Math.PI / 2;
     pinealTaper.renderOrder = 6;
@@ -1204,34 +1328,45 @@ export class BrainScene {
     // "In this theory", and never as part of the general anatomy.
     this.crystals = new THREE.Group();
     this.crystals.visible = false;
-    const crystalGeometry = new THREE.CylinderGeometry(0.009, 0.009, 0.03, 6, 1);
+    // Seen in the loupe they are large, so they are kept small and glassy: at the old size
+    // and opacity they read as a handful of white cubes.
+    const crystalGeometry = new THREE.CylinderGeometry(0.0048, 0.0048, 0.017, 6, 1);
     const crystalMaterial = new THREE.MeshStandardMaterial({
-      color: 0xdfeef2,
-      roughness: 0.12,
+      color: 0xa9d8df,
+      roughness: 0.15,
       metalness: 0.1,
       transparent: true,
-      opacity: 0.9,
+      opacity: 0.78,
       emissive: 0x0d3a3a,
       emissiveIntensity: 0.6,
       depthWrite: false,
       flatShading: true,
     });
-    for (let i = 0; i < 11; i += 1) {
+    // Spread through the gland's volume on a Fibonacci sphere, scaled inside the body's
+    // own proportions, at alternating depths: a sprinkle rather than a clump.
+    const CRYSTAL_COUNT = 16;
+    const golden = Math.PI * (3 - Math.sqrt(5));
+    for (let i = 0; i < CRYSTAL_COUNT; i += 1) {
       const crystal = new THREE.Mesh(crystalGeometry, crystalMaterial);
-      const angle = (i / 11) * Math.PI * 2;
-      const radius = 0.016 + (i % 3) * 0.011;
+      const y = 1 - ((i + 0.5) / CRYSTAL_COUNT) * 2;
+      const ring = Math.sqrt(1 - y * y);
+      const theta = golden * i;
+      const depth = i % 2 ? 0.62 : 0.9;
       crystal.position.set(
-        Math.cos(angle) * radius,
-        Math.sin(angle * 1.7) * 0.014,
-        Math.sin(angle) * radius * 0.8,
+        Math.cos(theta) * ring * 0.036 * depth,
+        y * 0.026 * depth,
+        Math.sin(theta) * ring * 0.029 * depth,
       );
-      crystal.rotation.set(angle * 1.3, angle, angle * 0.7);
+      crystal.rotation.set(theta * 1.3, theta, theta * 0.7);
       crystal.renderOrder = 7;
       this.crystals.add(crystal);
     }
     pineal.add(this.crystals);
     this.crystalMaterial = crystalMaterial;
     this.root.add(pineal);
+
+    this.pinealGroup = pineal;
+    [pinealBody, pinealTaper, ...this.crystals.children].forEach((mesh) => mesh.layers.enable(LOUPE_LAYER));
   }
 
   // The crystals turn slowly and catch the light, which is what the copy describes them
@@ -1245,7 +1380,6 @@ export class BrainScene {
 
   createInteractiveMarkers() {
     const coreGeometry = new THREE.SphereGeometry(0.02, 24, 12);
-    const shellGeometry = new THREE.SphereGeometry(0.062, 24, 12);
 
     STRUCTURES.forEach((structure) => {
       const markerGroup = new THREE.Group();
@@ -1262,15 +1396,9 @@ export class BrainScene {
       core.renderOrder = 10;
       markerGroup.add(core);
 
-      const shellMaterial = new THREE.MeshBasicMaterial({
-        color: BIO,
-        transparent: true,
-        opacity: 0.1,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-        fog: false,
-      });
-      const shell = new THREE.Mesh(shellGeometry, shellMaterial);
+      const shell = createGlowSprite(BIO, 0.22);
+      const shellMaterial = shell.material;
+      shell.scale.setScalar(MARKER_GLOW_SIZE);
       shell.renderOrder = 9;
       markerGroup.add(shell);
 
@@ -1288,8 +1416,8 @@ export class BrainScene {
 
   createBeams() {
     const beamGeometry = new THREE.CylinderGeometry(1, 1, 1, 24, 1, true);
-    const flareGeometry = new THREE.SphereGeometry(0.06, 24, 12);
-    const ringGeometry = new THREE.RingGeometry(0.86, 1, 48);
+    const entryGeometry = new THREE.RingGeometry(0.9, 1, 48);
+    const shockGeometry = new THREE.RingGeometry(0.94, 1, 64);
 
     BEAM_DEFS.forEach((symptom) => {
       const structure = getStructure(symptom.structureId);
@@ -1308,7 +1436,8 @@ export class BrainScene {
 
       // The line never changes length; because its midpoint is the target, the pulse
       // travelling 0 to 1 crosses the structure at exactly 0.5.
-      const haloMaterial = createBeamMaterial({ color: ACCENT, width: 1.1, intensity: 0.16 });
+      const envelope = { entry: crossings?.entry ?? 0.3, exit: crossings?.exit ?? 0.7 };
+      const haloMaterial = createBeamMaterial({ color: ACCENT, width: 1.1, intensity: 0.16, ...envelope });
       const halo = new THREE.Mesh(beamGeometry, haloMaterial);
       halo.position.copy(target);
       halo.quaternion.copy(quaternion);
@@ -1316,7 +1445,7 @@ export class BrainScene {
       halo.renderOrder = 11;
       group.add(halo);
 
-      const coreMaterial = createBeamMaterial({ color: ACCENT, width: 5.5, intensity: 0.9 });
+      const coreMaterial = createBeamMaterial({ color: ACCENT, width: 5.5, intensity: 0.9, ...envelope });
       const core = new THREE.Mesh(beamGeometry, coreMaterial);
       core.position.copy(target);
       core.quaternion.copy(quaternion);
@@ -1335,7 +1464,7 @@ export class BrainScene {
         fog: false,
         side: THREE.DoubleSide,
       });
-      const entryRing = new THREE.Mesh(ringGeometry, entryMaterial);
+      const entryRing = new THREE.Mesh(entryGeometry, entryMaterial);
       entryRing.position.copy(
         source.clone().add(travel.clone().multiplyScalar(fullLength * (crossings?.entry ?? 0.35))),
       );
@@ -1344,15 +1473,9 @@ export class BrainScene {
       entryRing.renderOrder = 13;
       group.add(entryRing);
 
-      const flareMaterial = new THREE.MeshBasicMaterial({
-        color: 0xffd9a8,
-        transparent: true,
-        opacity: 0,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-        fog: false,
-      });
-      const flare = new THREE.Mesh(flareGeometry, flareMaterial);
+      const flare = createGlowSprite(0xffd9a8, 0);
+      const flareMaterial = flare.material;
+      flare.scale.setScalar(FLARE_SIZE);
       flare.position.copy(target);
       flare.renderOrder = 14;
       group.add(flare);
@@ -1367,7 +1490,7 @@ export class BrainScene {
         fog: false,
         side: THREE.DoubleSide,
       });
-      const shock = new THREE.Mesh(ringGeometry, shockMaterial);
+      const shock = new THREE.Mesh(shockGeometry, shockMaterial);
       shock.position.copy(target);
       shock.renderOrder = 15;
       group.add(shock);
@@ -1398,7 +1521,17 @@ export class BrainScene {
   }
 
   createOverviewLabels() {
+    const svgNs = 'http://www.w3.org/2000/svg';
+    const leaders = document.createElementNS(svgNs, 'svg');
+    leaders.setAttribute('class', 'brain-label-leaders');
+    this.labelLayer.appendChild(leaders);
+
     CORE_MARKERS.forEach((marker) => {
+      const line = document.createElementNS(svgNs, 'line');
+      const dot = document.createElementNS(svgNs, 'circle');
+      dot.setAttribute('r', '2.5');
+      leaders.append(line, dot);
+
       const element = document.createElement('span');
       element.className = 'brain-label';
       element.dataset.label = marker.label;
@@ -1406,6 +1539,9 @@ export class BrainScene {
       this.labelLayer.appendChild(element);
       this.labels.push({
         element,
+        line,
+        dot,
+        offset: marker.offset,
         position: vectorFromArray(marker.position),
       });
     });
@@ -1510,8 +1646,8 @@ export class BrainScene {
   updateMarkers(now) {
     const breath = 0.5 + 0.5 * Math.sin(now / 620);
     this.markers.forEach((marker) => {
-      marker.shellMaterial.opacity = marker.active ? 0.16 + breath * 0.2 : 0.07;
-      marker.shell.scale.setScalar(marker.active ? 1 + breath * 0.35 : 0.8);
+      marker.shellMaterial.opacity = marker.active ? 0.42 + breath * 0.25 : 0.22;
+      marker.shell.scale.setScalar(MARKER_GLOW_SIZE * (marker.active ? 1.3 + breath * 0.35 : 1));
     });
   }
 
@@ -1553,19 +1689,19 @@ export class BrainScene {
     // The entry ring blooms as the force crosses the cortical surface.
     const atEntry = 1 - clamp(Math.abs(travelled - beam.entryProgress) / 0.09);
     const entry = smoothstep(0, 1, atEntry);
-    beam.entryMaterial.opacity = 0.85 * entry;
+    beam.entryMaterial.opacity = 0.6 * entry;
     beam.entryRing.scale.setScalar(0.1 + 0.13 * (1 - entry));
 
     // Everything brightens as the pulse passes through the structure.
     const nearness = 1 - clamp(Math.abs(timeline - 0.5) / 0.14);
     const strength = smoothstep(0, 1, nearness);
-    beam.flareMaterial.opacity = 0.6 * strength;
-    beam.flare.scale.setScalar(1 + 2.2 * strength);
+    beam.flareMaterial.opacity = 0.5 * strength;
+    beam.flare.scale.setScalar(FLARE_SIZE * (1 + 1.6 * strength));
     beam.coreMaterial.uniforms.uIntensity.value = 0.7 + 0.5 * strength;
 
     // The shockwave leaves the nucleus once the force has arrived, and only then.
     const wave = clamp((timeline - 0.5) / 0.3);
-    beam.shockMaterial.opacity = wave > 0 ? 0.5 * (1 - wave) : 0;
+    beam.shockMaterial.opacity = wave > 0 ? 0.35 * (1 - wave) : 0;
     beam.shock.scale.setScalar(0.06 + wave * 0.44);
     beam.shock.quaternion.copy(this.camera.quaternion);
   }
@@ -1579,8 +1715,8 @@ export class BrainScene {
     if (!beam) return;
     this.setBeamVisible(id, true);
     this.setCursorVisible(id, false);
-    beam.flareMaterial.opacity = flare ? 0.55 : 0;
-    beam.flare.scale.setScalar(flare ? 2.6 : 1);
+    beam.flareMaterial.opacity = flare ? 0.42 : 0;
+    beam.flare.scale.setScalar(FLARE_SIZE * (flare ? 2.2 : 1));
     beam.coreMaterial.uniforms.uIntensity.value = flare ? 0.85 : 0.5;
     beam.haloMaterial.uniforms.uIntensity.value = flare ? 0.16 : 0.08;
   }
@@ -1744,22 +1880,185 @@ export class BrainScene {
     });
   }
 
+  // A magnifier inset for the Pineal section. The gland is drawn into a small render
+  // target by a camera on the main view's own bearing, close in, seeing only the loupe
+  // layer; the result is laid over the main pass as a disc in the stage's corner, with a
+  // leader back to the gland. One context, one scene: this is a second look, not a second
+  // specimen.
+  createLoupe() {
+    const view = new THREE.OrthographicCamera(0, 1, 1, 0, -1, 1);
+    const target = new THREE.WebGLRenderTarget(2, 2, { samples: 4 });
+    const material = new THREE.ShaderMaterial({
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+      uniforms: {
+        uMap: { value: target.texture },
+        uRing: { value: new THREE.Color(BIO) },
+        uReveal: { value: 0 },
+        // One screen pixel in the disc's own units, for anti-aliasing its edge.
+        uPixel: { value: 0.01 },
+      },
+      vertexShader: /* glsl */ `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: /* glsl */ `
+        uniform sampler2D uMap;
+        uniform vec3 uRing;
+        uniform float uReveal;
+        uniform float uPixel;
+        varying vec2 vUv;
+        void main() {
+          float r = length(vUv * 2.0 - 1.0);
+          float disc = 1.0 - smoothstep(1.0 - uPixel * 1.5, 1.0, r);
+          if (disc <= 0.0) discard;
+          vec3 color = texture2D(uMap, vUv).rgb;
+          // A faint cool well of light behind the gland, so the inset reads as a lens on
+          // the specimen rather than a hole in it.
+          color += vec3(0.012, 0.03, 0.036) * (1.0 - smoothstep(0.0, 1.0, r));
+          // A hairline rim in the instrument's colour, like the hero's reticle.
+          float ring = smoothstep(1.0 - uPixel * 2.2, 1.0 - uPixel * 0.8, r);
+          color = mix(color, uRing * 0.42, ring * 0.9);
+          gl_FragColor = vec4(color, disc * uReveal);
+          #include <tonemapping_fragment>
+          #include <colorspace_fragment>
+        }
+      `,
+    });
+    const disc = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material);
+    const scene = new THREE.Scene();
+    scene.add(disc);
+
+    const camera = new THREE.PerspectiveCamera(26, 1, 0.01, 4);
+    camera.layers.set(LOUPE_LAYER);
+
+    const svgNs = 'http://www.w3.org/2000/svg';
+    const leader = document.createElementNS(svgNs, 'svg');
+    leader.setAttribute('class', 'brain-loupe-leader');
+    const line = document.createElementNS(svgNs, 'line');
+    const dot = document.createElementNS(svgNs, 'circle');
+    dot.setAttribute('r', '2.5');
+    leader.append(line, dot);
+    leader.style.opacity = '0';
+    this.container.appendChild(leader);
+
+    this.loupe = {
+      view,
+      target,
+      material,
+      disc,
+      scene,
+      camera,
+      leader,
+      line,
+      dot,
+      reveal: 0,
+      clearColor: new THREE.Color(),
+      pineal: new THREE.Vector3(),
+      bearing: new THREE.Vector3(),
+    };
+  }
+
+  renderLoupe() {
+    const loupe = this.loupe;
+    const rect = this.frameRect;
+    const wanted = this.stage === 'pineal-body' && rect ? 1 : 0;
+    loupe.reveal = this.reducedMotion
+      ? wanted
+      : loupe.reveal + (wanted - loupe.reveal) * (1 - Math.pow(0.03, this.delta));
+    if (loupe.reveal < 0.01 || !rect) {
+      loupe.leader.style.opacity = '0';
+      return;
+    }
+
+    const width = this.container.clientWidth;
+    const height = this.container.clientHeight;
+    const radius = clamp(Math.min(rect.width, rect.height) * 0.2, 56, 124);
+    const cx = rect.left + rect.width - radius * 1.12;
+    const cy = rect.top + rect.height - radius * 1.12;
+
+    // The same bearing as the main view, so the inset shows the gland the way the reader
+    // is already looking at it.
+    this.pinealGroup.getWorldPosition(loupe.pineal);
+    loupe.bearing.copy(this.camera.position).sub(this.controls.target).normalize();
+    loupe.camera.position.copy(loupe.pineal).addScaledVector(loupe.bearing, LOUPE_DISTANCE);
+    loupe.camera.lookAt(loupe.pineal);
+
+    const size = Math.max(2, Math.round(radius * 2 * this.renderer.getPixelRatio()));
+    if (loupe.target.width !== size) loupe.target.setSize(size, size);
+
+    this.renderer.getClearColor(loupe.clearColor);
+    const clearAlpha = this.renderer.getClearAlpha();
+    this.renderer.setRenderTarget(loupe.target);
+    this.renderer.setClearColor(0x05070d, 1);
+    this.renderer.clear();
+    this.renderer.render(this.scene, loupe.camera);
+    this.renderer.setRenderTarget(null);
+    this.renderer.setClearColor(loupe.clearColor, clearAlpha);
+
+    loupe.view.right = width;
+    loupe.view.top = height;
+    loupe.view.updateProjectionMatrix();
+    loupe.disc.position.set(cx, height - cy, 0);
+    loupe.disc.scale.set(radius * 2, radius * 2, 1);
+    loupe.material.uniforms.uReveal.value = loupe.reveal;
+    loupe.material.uniforms.uPixel.value = 1 / radius;
+
+    const autoClear = this.renderer.autoClear;
+    this.renderer.autoClear = false;
+    this.renderer.render(loupe.scene, loupe.view);
+    this.renderer.autoClear = autoClear;
+
+    // The leader runs from the gland to the nearest point of the disc's rim.
+    this.tmpVector.copy(loupe.pineal).project(this.camera);
+    const gx = (this.tmpVector.x * 0.5 + 0.5) * width;
+    const gy = (-this.tmpVector.y * 0.5 + 0.5) * height;
+    const dx = gx - cx;
+    const dy = gy - cy;
+    const reach = Math.hypot(dx, dy) || 1;
+    loupe.line.setAttribute('x1', gx.toFixed(1));
+    loupe.line.setAttribute('y1', gy.toFixed(1));
+    loupe.line.setAttribute('x2', (cx + (dx / reach) * radius).toFixed(1));
+    loupe.line.setAttribute('y2', (cy + (dy / reach) * radius).toFixed(1));
+    loupe.dot.setAttribute('cx', gx.toFixed(1));
+    loupe.dot.setAttribute('cy', gy.toFixed(1));
+    loupe.leader.style.opacity = loupe.reveal.toFixed(3);
+  }
+
   updateLabels() {
     if (this.labelLayer.hidden) return;
 
     const width = this.container.clientWidth;
     const height = this.container.clientHeight;
+    // The bearings are drawn for a 620px stage and shrink with smaller ones.
+    const reach = clamp((this.frameRect?.width ?? 620) / 620, 0.6, 1);
 
     this.labels.forEach((label) => {
-      this.tmpVector.copy(label.position);
+      // The anchor moves with the sway, so it is projected from the root's current pose.
+      this.tmpVector.copy(label.position).applyMatrix4(this.root.matrixWorld);
       this.tmpVector.project(this.camera);
       const x = (this.tmpVector.x * 0.5 + 0.5) * width;
       const y = (-this.tmpVector.y * 0.5 + 0.5) * height;
+      const lx = x + label.offset[0] * reach;
+      const ly = y + label.offset[1] * reach;
       const visible = this.tmpVector.z < 1 && x > -40 && x < width + 40 && y > -40 && y < height + 40;
 
       // Transform, not left/top: these move every frame and must composite, not lay out.
-      label.element.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%)`;
+      label.element.style.transform = `translate(${lx}px, ${ly}px) translate(-50%, -50%)`;
       label.element.style.opacity = visible ? '1' : '0';
+      // The leader runs to the label's centre; the label's own ground covers the end.
+      label.line.setAttribute('x1', x.toFixed(1));
+      label.line.setAttribute('y1', y.toFixed(1));
+      label.line.setAttribute('x2', lx.toFixed(1));
+      label.line.setAttribute('y2', ly.toFixed(1));
+      label.dot.setAttribute('cx', x.toFixed(1));
+      label.dot.setAttribute('cy', y.toFixed(1));
+      label.line.style.opacity = visible ? '1' : '0';
+      label.dot.style.opacity = visible ? '1' : '0';
     });
   }
 
@@ -1781,6 +2080,7 @@ export class BrainScene {
     this.updateFog();
     this.updateLabels();
     this.renderer.render(this.scene, this.camera);
+    this.renderLoupe();
     this.frame = requestAnimationFrame(this.render);
   }
 
@@ -1796,5 +2096,8 @@ export class BrainScene {
     this.renderer.dispose();
     this.renderer.domElement.remove();
     this.labelLayer.remove();
+    this.loupe?.target.dispose();
+    this.loupe?.material.dispose();
+    this.loupe?.leader.remove();
   }
 }
