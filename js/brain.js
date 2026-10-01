@@ -156,6 +156,16 @@ function lerpKeyframeFill(u) {
 // How long the rig stays out of the way after the reader stops turning the model.
 const USER_CONTROL_HOLD = 2600;
 
+// The reader may zoom the specimen down to half its framed size or up to twice it: the
+// camera stays within a factor of two of the framed distance, re-derived as framing does.
+// At either bound the wheel goes back to the page.
+const ZOOM_RANGE = 2;
+
+// A wheel that arrives within this long of the page scrolling continues the scroll. The
+// stages are sticky, so mid-scroll one slides under a resting pointer; catching the wheel
+// there stopped the page dead and spent the reader's scroll on zoom.
+const SCROLL_SETTLE = 350;
+
 // The pineal loupe: the gland and its crystals drawn a second time, close up, on their own
 // render layer so nothing else in the specimen gets into the inset.
 const LOUPE_LAYER = 1;
@@ -920,12 +930,41 @@ export class BrainScene {
     this.controls.enableDamping = !this.reducedMotion;
     this.controls.dampingFactor = 0.065;
     this.controls.enablePan = false;
-    // Framing pushes the camera back so the model reads at its window's size rather than
-    // the viewport's, so the usable range is much wider than it was inside a stage box.
+    // Placeholders until the first framed pose: framedPose sets both bounds from the
+    // framed distance (see ZOOM_RANGE).
     this.controls.minDistance = 0.9;
     this.controls.maxDistance = 14;
     this.controls.maxPolarAngle = Math.PI * 0.86;
     this.controls.minPolarAngle = Math.PI * 0.1;
+    // Faster than the default, so reaching either bound takes about four wheel notches in
+    // Chrome (100px each) rather than fourteen, before the wheel goes back to the page.
+    // Firefox's line-mode notches arrive smaller and take about nine.
+    this.controls.zoomSpeed = 3;
+
+    // OrbitControls cancels every wheel event it receives, so while the pointer was over a
+    // stage the page could not scroll. This runs first (window, capture phase) and stops the
+    // event short of the control surface whenever the wheel belongs to the page: while the
+    // page is already scrolling, and once zoom has reached its bound in the wheel's
+    // direction. Uncancelled, the browser scrolls the page with it.
+    this.lastPageScroll = -Infinity;
+    this.handleWheel = (event) => {
+      if (event.target !== controlSurface) return;
+      const scrolling = performance.now() - this.lastPageScroll < SCROLL_SETTLE;
+      const distance = this.camera.position.distanceTo(this.controls.target);
+      let atBound = true;
+      if (event.deltaY > 0) atBound = distance >= this.controls.maxDistance * 0.999;
+      else if (event.deltaY < 0) atBound = distance <= this.controls.minDistance * 1.001;
+      if (scrolling || atBound) event.stopPropagation();
+    };
+    window.addEventListener('wheel', this.handleWheel, { capture: true, passive: true });
+
+    // Scrolling hands the model straight back to the rig, so it follows its stage with the
+    // page instead of staying parked for the rest of the hold after a zoom or a turn.
+    this.handlePageScroll = () => {
+      this.lastPageScroll = performance.now();
+      this.releaseUserControl();
+    };
+    window.addEventListener('scroll', this.handlePageScroll, { passive: true });
 
     // While the reader is turning the model themselves the rig stops writing the camera,
     // and eases back only once they have let go and settled.
@@ -976,6 +1015,12 @@ export class BrainScene {
   // The rig holds the pose the camera is heading for. Scroll moves it along a spline
   // through the stage keyframes; a selection can pull it to a structure; the render loop
   // eases the real camera toward it. Nothing jump-cuts.
+
+  // Ends the hold that follows a zoom or a turn, so the rig takes the camera back now. A
+  // drag still in progress keeps it.
+  releaseUserControl() {
+    if (this.userControlUntil !== Infinity) this.userControlUntil = 0;
+  }
 
   // Handing the model to a different section: it drops whatever the previous section had
   // lit, and that section's own handler re-applies its state.
@@ -1130,6 +1175,8 @@ export class BrainScene {
       this.fitDistance(target, s.dir, rect, height) * (this.rigPose?.fill ?? DEFAULT_FILL),
     );
     s.pos.copy(target).addScaledVector(s.dir, distance);
+    this.controls.maxDistance = distance * ZOOM_RANGE;
+    this.controls.minDistance = Math.max(MIN_CAMERA_DISTANCE * 0.75, distance / ZOOM_RANGE);
 
     const worldHeight = 2 * distance * Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2);
     const worldWidth = worldHeight * this.camera.aspect;
@@ -2089,6 +2136,8 @@ export class BrainScene {
     cancelAnimationFrame(this.frame);
     this.keyTargets?.forEach((el) => el.removeEventListener('keydown', this.handleKey));
     document.removeEventListener('visibilitychange', this.updateRunState);
+    window.removeEventListener('wheel', this.handleWheel, { capture: true });
+    window.removeEventListener('scroll', this.handlePageScroll);
     this.resizeObserver?.disconnect();
     this.controls?.dispose();
     disposeObject(this.root);

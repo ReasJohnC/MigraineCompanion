@@ -85,6 +85,10 @@ Still open: an Amazon link for *On the Other Side of Migraine*, deferred by the 
   Structures it is sticky beside the controls, so the force plays where the reader is
   looking; in one column it sits above them, and a choice made below brings it back into
   view. Framing fits the specimen's measured extremes, so no view crops it at any size.
+- Zoom (wheel, pinch or +/−) is bounded to between half and twice the model's framed size,
+  about four wheel notches each way. At a bound, or while the page is already scrolling, the
+  wheel scrolls the page, so a sticky stage under a resting pointer never stops a scroll; and
+  scrolling hands the model straight back to the page, easing it to its framed size.
 - The idle motion is a slow ±8° sway rather than a turn, so each section keeps the view its
   keyframe was chosen for; in the capstone it settles to rest, because the five angles are
   that section's argument.

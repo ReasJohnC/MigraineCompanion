@@ -162,6 +162,9 @@ from the source copy.
 - Framing fits the specimen's measured extremes (support points on the cortex, cerebellum
   and brainstem) into each stage; fog travels with the camera. The idle motion is a ±8°
   sway that settles to rest in the capstone, where the beams' separation is the point.
+- Zoom is bounded to half and twice the framed size (the camera stays within a factor of two
+  of the framed distance). The wheel belongs to the page at either bound and whenever the page
+  scrolled in the last 350 ms; OrbitControls would otherwise cancel it and stall the scroll.
 - The Pineal section keeps the whole specimen and adds a loupe: the gland and its crystals
   rendered close up on their own layer into an inset disc, with a leader to the gland.
 - Copy and controls load apart from the 3-D module (dynamic import), so they never wait
