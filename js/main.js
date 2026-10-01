@@ -156,8 +156,8 @@ async function bootstrap() {
     return;
   }
 
+  // Exposed for the verification harness, under the names its checks use.
   window.__scene = scene;
-  // The UI modules were written against one scene per section; they now share the one.
   window.__scenes = { overview: scene, simulator: scene, structures: scene, angles: scene };
 
   // Handing the model to the section in view also restates that section's selection.

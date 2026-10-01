@@ -23,7 +23,9 @@ force-beam pass through specific structures at distinct angles.
     Nothing measured is ever warm, and the force is never cool. That rule is what keeps a
     high-contrast presentation from making an unproven theory look like settled science.
   - Hairlines at low alpha, 4-6px radii, an 8px dot grid on panels, corner ticks rather
-    than frames. Elevation from border luminance and backdrop blur; **no drop shadows**.
+    than frames. Elevation from border luminance; **no drop shadows, no backdrop blur**
+    (the canvas repaints every frame, so a blurred surface re-blurs every frame). The
+    header is opaque. One control shape and one cool focus ring throughout.
   - Data is set in mono. Precision, real numbers and controlled motion belong to the
     *instrument* — never to the *claims*.
   - Still true: calm and credible, not gamey. No fear-mongering. The medical disclaimer
@@ -151,9 +153,26 @@ from the source copy.
 - `prefers-reduced-motion`: skip beam travel + camera easing; show final state instantly.
 - Persist last-selected structure in `localStorage`; restore on load.
 
+## Layout
+- The model always sits in the right-hand column. The hero's bullseye is a transparent
+  reticle over the model, whose camera aims at the Prodrome Zone so the rings sit on it.
+- Simulator and Structures: controls and readout on the left, a sticky stage on the right.
+  In one column the stage comes first and a choice made below it scrolls just enough of it
+  back into view.
+- Framing fits the specimen's measured extremes (support points on the cortex, cerebellum
+  and brainstem) into each stage; fog travels with the camera. The idle motion is a ±8°
+  sway that settles to rest in the capstone, where the beams' separation is the point.
+- The Pineal section keeps the whole specimen and adds a loupe: the gland and its crystals
+  rendered close up on their own layer into an inset disc, with a leader to the gland.
+- Copy and controls load apart from the 3-D module (dynamic import), so they never wait
+  for three.js. While it loads each stage shows a quiet ring; without WebGL each stage
+  states that the model could not start.
+
 ## Acceptance criteria
 
 - Loads with **NO console errors or warnings**, on load and through every interaction.
+- Copy and controls render without three.js; without WebGL no message floats over the page.
+- The model sits inside its stage, uncropped, at every viewport from 390 to 1920 wide.
 - All four structure chips work; **#1 shows no beam**; #4 sequence + show-all work.
 - Distinct, correct beam angles per structure; **pineal visibly "special."**
 - Smooth 3D (~60fps desktop; degrade gracefully on mobile); canvas responsive; handles resize.

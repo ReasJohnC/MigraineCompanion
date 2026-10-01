@@ -7,9 +7,9 @@ producing different prodrome (pre-migraine) symptoms.
 
 ## What's here
 - `index.html`, `css/`, `js/`, `assets/` — the site (100% static; Three.js 0.160.1 is
-  vendored in `js/vendor/`, so nothing is fetched from any external host — with the CDN,
-  one unreachable host cost the page all of its copy, since the text is injected by the
-  same module graph).
+  vendored in `js/vendor/`, so nothing is fetched from any external host). The copy and
+  controls load apart from the 3-D module, which arrives by dynamic import: they render at
+  once, and keep working if the model is slow or WebGL is unavailable.
 - `content/` — source draft copy per structure (the site text is built from these).
 - `BUILD-SPEC.md` — the build specification, updated for the dark-instrument direction.
 - `*.sh` — Codex fan-out helper scripts used during the build (not needed to run the site).
@@ -29,12 +29,14 @@ python3 -m http.server 4173
 ## The sections
 The page numbers them 01-05, after an unnumbered opening.
 
-- **Opening** — title, thesis, medical note, "Prodrome Zone" bullseye
+- **Opening** — title, thesis, medical note, and the "Prodrome Zone" reticle laid over the
+  model, centred on the zone itself
 - **01 The Migraine Prodrome Zone** (overview — thalamus/hypothalamus/pineal, no line)
 - **02 Energy Impact Simulator** — *Migraine without Aura* / *Migraine with Aura*; four
   symptoms each, singly or in combination
 - **03 The Structures** — reference catalogue, symptom-first
-- **04 Pineal Body (Gland)** — circadian rhythm, and microcrystals as the aura mechanism
+- **04 Pineal Body (Gland)** — circadian rhythm, and microcrystals as the aura mechanism; a
+  loupe magnifies the gland and its crystals beside the whole specimen
 - **05 Angles of Force** (capstone — play the sequence or show all lines together)
 
 ## Symptoms and anatomy
@@ -79,6 +81,15 @@ Still open: an Amazon link for *On the Other Side of Migraine*, deferred by the 
   No `backdrop-filter` anywhere: blurred surfaces over an always-animating canvas re-blur
   every frame, and were the largest scroll cost. Render resolution is capped at DPR 1.5
   (1.25 under 760px) — with MSAA the organic model shows no visible edge for it.
+- **The model lives in the right-hand column** of every section. In the Simulator and the
+  Structures it is sticky beside the controls, so the force plays where the reader is
+  looking; in one column it sits above them, and a choice made below brings it back into
+  view. Framing fits the specimen's measured extremes, so no view crops it at any size.
+- The idle motion is a slow ±8° sway rather than a turn, so each section keeps the view its
+  keyframe was chosen for; in the capstone it settles to rest, because the five angles are
+  that section's argument.
+- The force fades in from outside the head and out past the far surface; impacts are soft
+  glows rather than bright discs (the readers include people with photophobia).
 - The panels state the model's real numbers — target, position, entry vector, entry angle,
   and the measured pineal clearance — so the author's hard constraint is something the
   reader can watch hold rather than take on trust.
