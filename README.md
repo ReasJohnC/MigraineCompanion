@@ -1,6 +1,6 @@
 # Migraine Companion
 
-## This build contains edits as requested by Lynn, but some edits are still underway to refine the UI and fix some bugs in animation movement.
+## This build contains the edits requested by Lynn, including the refined UI and the fixes to the animation's movement.
 
 A static, interactive migraine companion. It visualizes the
 companion's hypothesis that a migraine can begin when an "energy force" enters a deep-brain
