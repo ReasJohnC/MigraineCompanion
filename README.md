@@ -29,8 +29,8 @@ python3 -m http.server 4173
 ## The sections
 The page numbers them 01-05, after an unnumbered opening.
 
-- **Opening** — title, thesis, medical note, and the "Prodrome Zone" reticle laid over the
-  model, centred on the zone itself
+- **Opening** — over-title and the author's byline, title, thesis, medical note, and the
+  "Prodrome Zone" reticle laid over the model, centred on the zone itself
 - **01 The Migraine Prodrome Zone** (overview — thalamus/hypothalamus/pineal, no line)
 - **02 Energy Impact Simulator** — *Migraine without Aura* / *Migraine with Aura*; four
   symptoms each, singly or in combination

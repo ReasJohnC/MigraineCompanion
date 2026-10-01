@@ -212,6 +212,7 @@ function initCopy() {
   const { hero, prodromeZone, pineal, angles, footer } = PAGE_COPY;
 
   setText('[data-copy="hero-eyebrow"]', hero.eyebrow);
+  setText('[data-copy="hero-byline"]', hero.byline);
   setText('[data-copy="hero-title"]', hero.title);
   setText('[data-copy="hero-thesis"]', hero.thesis);
   setText('[data-copy="hero-disclaimer"]', hero.disclaimer);

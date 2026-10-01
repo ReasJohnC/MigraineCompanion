@@ -28,7 +28,9 @@ the visual to screen-reader users and must stay literal.
 
 ## Opening
 
-- Over-title: **Migraine Companion: Energy Impact Simulator**
+- Over-title: **Migraine: Energy Impact Simulator** (was "Migraine Companion: Energy Impact
+  Simulator"; retitled on John's instruction, 2026-09-30, and the browser-tab title follows it)
+- Byline, directly under the over-title: **By Lynn C. Turner**
 - Heading: **Welcome to the Neural Neighborhood of Migraine**
 - Hero graphic: bullseye titled "Prodrome Zone" (replaced the migraine-phases timeline)
 
@@ -158,8 +160,9 @@ The citation reuses the author's sentence from the lateral tuberal description: 
 Other Side of Migraine* by this author for a complete description and rationale for all of the
 concepts presented here."
 
-**Open:** the author is credited only as "this author". Their name does not appear anywhere in
-the repository, so no byline was invented. `PAGE_COPY.footer` is where it goes when supplied.
+The author's name, supplied by John on 2026-09-30, appears once: as the byline under the
+over-title (`PAGE_COPY.hero.byline`). The two citations keep the author's own "by this author",
+since those sentences are the author's wording.
 
 ## Open item
 

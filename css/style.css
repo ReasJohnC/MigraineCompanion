@@ -1143,12 +1143,26 @@ h3 {
 /* ---------- Hero: eyebrow, disclaimer, bullseye ---------- */
 
 .eyebrow {
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.45rem;
   color: var(--bio);
   font-size: 0.82rem;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+/* The author's byline: finer than the over-title above it, in an old-style italic —
+   Palatino's is the calligraphic one, its forms close to a written hand. System faces only,
+   so it costs nothing to load: Palatino on Apple, Palatino Linotype on Windows, the
+   platform serif's italic elsewhere. */
+.byline {
+  margin: 0 0 1.35rem;
+  color: #c9d6dc;
+  font-family: "Palatino Linotype", Palatino, "Book Antiqua", "URW Palladio L", "TeX Gyre Pagella", Georgia, serif;
+  font-size: 1.125rem;
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: 0.01em;
 }
 
 .medical-note {

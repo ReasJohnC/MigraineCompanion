@@ -84,7 +84,8 @@ export const BEAM_SEQUENCE = [...SYMPTOM_IDS, AURA_SYMPTOM.id];
 
 export const PAGE_COPY = {
   hero: {
-    eyebrow: 'Migraine Companion: Energy Impact Simulator',
+    eyebrow: 'Migraine: Energy Impact Simulator',
+    byline: 'By Lynn C. Turner',
     title: 'Welcome to the Neural Neighborhood of Migraine',
     thesis:
       'Migraine can begin when an energy force enters the deep-brain Migraine Prodrome Zone at a specific angle. Different angles reach different neural clusters, and each cluster answers with its own warning symptom — arriving well before the severe migraine pain begins.',
