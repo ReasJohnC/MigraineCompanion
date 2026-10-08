@@ -1,6 +1,6 @@
 # Migraine Companion
 ## Built for researcher Lynn Turner as a companion to her books *On the Other Side of Migraine* and *Migraine Neurodiversity*
-## Check it out at www.migraineidentity.com
+## Find them, and this build, at www.migraineidentity.com
 
 ## This build contains a newly refined UI and fixes to the animation's movement.
 
