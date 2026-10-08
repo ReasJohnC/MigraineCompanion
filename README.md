@@ -1,4 +1,6 @@
 # Migraine Companion
+## Built for researcher Lynn Turner as a companion to her books *On the Other Side of Migraine* and *Migraine Neurodiversity*
+## Check it out at www.migraineidentity.com
 
 ## This build contains a newly refined UI and fixes to the animation's movement.
 
@@ -22,11 +24,6 @@ No build step. Serve the folder over HTTP (ES modules require http://, not file:
 python3 -m http.server 4173
 # then open http://localhost:4173
 ```
-
-## Deploy to Netlify
-- Drag-and-drop this folder into the Netlify dashboard, **or** connect the git repo.
-- No build command. **Publish directory: `.`** (repo root). See `netlify.toml`.
-
 ## The sections
 The page numbers them 01-05, after an unnumbered opening.
 
